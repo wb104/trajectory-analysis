@@ -1,4 +1,6 @@
 import numpy
+  
+from scipy.optimize import curve_fit
 
 from matplotlib import pyplot as plt
 from matplotlib import colors
@@ -272,6 +274,100 @@ def saveTracksColoredByFrames(tracks, filePrefix, cutoffValue, plotDpi):
   #plt.show()
   plt.close()
   
+def _getResidenceTimes(tracks):
+  
+  return [track.deltaFrames for track in tracks]
+  
+def saveResidenceTimes(tracks, filePrefix):
+  
+  residenceTimes = _getResidenceTimes(tracks)
+  
+  fileName = '%s_residenceTimes.csv' % filePrefix
+  with open(fileName, 'w') as fp:
+    fp.write('%s\n' % ','.join(['%d' % residenceTime for residenceTime in residenceTimes]))
+  
+def _getSurvivalCounts(tracks, maxSize=0):
+
+  residenceTimes = _getResidenceTimes(tracks)
+  if maxSize == 0:
+    maxSize = max(residenceTimes)
+  survivalCounts = numpy.zeros(maxSize, dtype='int32')
+  ones = numpy.ones(maxSize, dtype='int32')
+  for residenceTime in residenceTimes:
+    survivalCounts[:residenceTime] += ones[:residenceTime]
+    
+  return survivalCounts
+  
+def saveSurvivalCounts(tracks, filePrefix, maxSize=0):
+  
+  survivalCounts = _getSurvivalCounts(tracks, maxSize)
+  
+  fileName = '%s_survivalCounts.csv' % filePrefix
+  with open(fileName, 'w') as fp:
+    fp.write('%s\n' % ','.join(['%d' % survivalCount for survivalCount in survivalCounts]))
+
+"""
+def _fitSurvival(xdata, *params):
+
+  #A, B = params[:2]
+  #tau1, tau2 = params[2:4]
+  #A = params[0]
+  #B = 1 - A
+  #tau1, tau2 = params[1:3]
+  #ydata = A * numpy.exp(-xdata/tau1) + B * numpy.exp(-xdata/tau2)
+
+  nexps = (1+len(params)) // 2
+  #nexps = len(params) // 2
+  #nexps = (len(params) - 1) // 2
+  params = list(params)
+  if nexps == 1:
+    params.insert(0, 1.0)
+  else:
+    params.insert(nexps-1, 1-sum(params[:nexps-1]))
+
+  ydata = numpy.zeros(len(xdata), dtype='float32')
+  for i in range(nexps):
+    ydata += params[i] * numpy.exp(-xdata/params[i+nexps])
+    ###ydata += params[i] * xdata * xdata * numpy.exp(-xdata*xdata/params[i+nexps])
+
+  return ydata
+
+def fitSurvivalCounts(tracks, filePrefix, numberExponentials=1):
+  
+  survivalCounts = _getSurvivalCounts(tracks)
+  
+  ydata = survivalCounts / survivalCounts[0]
+  xdata = 1 + numpy.arange(len(ydata))
+  
+  r = 1.0 / numberExponentials
+
+  params0 = (numberExponentials-1)*[r] + numberExponentials*[0.1]
+  print('params0', numberExponentials, params0)
+
+  #bounds0 = (numberExponentials-1)*[0] + numberExponentials*[0.0]
+  #bounds1 = (numberExponentials-1)*[1] + numberExponentials*[numpy.inf]
+  #bounds = (bounds0, bounds1)
+  #popt, pcov = curve_fit(f, xdata, ydata, p0=p0, bounds=bounds)
+  params_opt, params_cov = curve_fit(_fitSurvival, xdata, ydata, p0=params0)
+
+  params = list(params_opt)
+  if numberExponentials == 1:
+    params.insert(0, 1.0)
+  else:
+    params.insert(numberExponentials-1, 1-sum(params[:numberExponentials-1]))
+  params = tuple(params)
+  #print('A=%f, B=%f, tau1=%f, tau2=%f' % params)
+  #print('params', nexps, popt)
+  print('params', numberExponentials, params)
+
+  yfit = f(xdata, *popt)
+  plt.plot(xdata, yfit, color=colors[nexps])
+  
+  fileName = '%s_survivalCounts.csv' % filePrefix
+  with open(fileName, 'w') as fp:
+    fp.write('%s\n' % ','.join(['%d' % survivalCount for survivalCount in survivalCounts]))
+"""
+    
 if __name__ == '__main__':
 
   import os
