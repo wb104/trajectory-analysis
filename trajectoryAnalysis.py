@@ -117,8 +117,8 @@ def main():
       if args.saveSurvivalCounts > 0:
         Track.saveSurvivalCounts(tracks, filePrefix, args.saveSurvivalCounts)
         
-      if args.fitSurvivalCounts > 0:
-        Track.fitSurvivalCounts(tracks, filePrefix, args.fitSurvivalCounts)
+      #if args.fitSurvivalCounts > 0:
+      #  Track.fitSurvivalCounts(tracks, filePrefix, args.fitSurvivalCounts)
         
 if __name__ == '__main__':
   
