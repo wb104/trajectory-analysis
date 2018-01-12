@@ -163,7 +163,7 @@ def saveNumTracksInBin(tracks, filePrefix, binSize, maxValue, plotDpi):
   plt.xlim((0, len(numTracks[0]-1)))
   plt.ylim((len(numTracks)-1, 0))  # y axis is backwards
 
-  fileName = '%s_countHeat' % filePrefix
+  fileName = '%s_countHeat.png' % filePrefix
   plt.savefig(fileName, dpi=plotDpi, transparent=True)
   #plt.show()
   plt.close()
@@ -250,7 +250,7 @@ def saveTrackFramesInBin(tracks, filePrefix, binSize, cutoffValue, plotDpi):
   plt.xlim((0, xSize-1))
   plt.ylim((ySize-1, 0))  # y axis is backwards
 
-  fileName = '%s_framesByBin' % filePrefix
+  fileName = '%s_framesByBin.png' % filePrefix
   plt.savefig(fileName, dpi=plotDpi, transparent=True)
   #plt.show()
   plt.close()
@@ -269,7 +269,7 @@ def saveTracksColoredByFrames(tracks, filePrefix, cutoffValue, plotDpi):
     
   plt.ylim(plt.ylim()[::-1])
   
-  fileName = '%s_tracksByFrames' % filePrefix
+  fileName = '%s_tracksByFrames.png' % filePrefix
   plt.savefig(fileName, dpi=plotDpi, transparent=True)
   #plt.show()
   plt.close()
