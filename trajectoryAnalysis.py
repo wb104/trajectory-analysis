@@ -17,7 +17,7 @@ def main():
   arg_parse = ArgumentParser(prog=PROG_NAME, description=DESCRIPTION,
                              epilog=epilog, prefix_chars='-', add_help=True)
                              
-  arg_parse.add_argument('directories', nargs='*',
+  arg_parse.add_argument('directories', nargs='+',
                          help='Directories containing *%s files to be analysed' % SUFFIX)
 
   arg_parse.add_argument('-numDimensions', default=2, type=int,
@@ -65,8 +65,8 @@ def main():
   arg_parse.add_argument('-saveSurvivalCounts', default=0, type=int,
                          help='Save survival counts (how many tracks last at least a given amount) with specified cutoff to a csv file')
                              
-  #arg_parse.add_argument('-fitSurvivalCounts', default=0, type=int,
-  #                       help='Fit survival counts (how many tracks last at least a given amount) to specified number of exponentials, and save result to a csv file')
+  arg_parse.add_argument('-fitSurvivalCounts', default=0, type=int,
+                         help='Fit survival counts (how many tracks last at least a given amount) to specified number of exponentials, and save result to a csv file')
   
   args = arg_parse.parse_args()
 
@@ -117,8 +117,8 @@ def main():
       if args.saveSurvivalCounts > 0:
         Track.saveSurvivalCounts(tracks, filePrefix, args.saveSurvivalCounts)
         
-      #if args.fitSurvivalCounts > 0:
-      #  Track.fitSurvivalCounts(tracks, filePrefix, args.fitSurvivalCounts)
+      if args.fitSurvivalCounts > 0:
+        Track.fitSurvivalCounts(tracks, filePrefix, args.fitSurvivalCounts, args.plotDpi)
         
 if __name__ == '__main__':
   

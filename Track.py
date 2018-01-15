@@ -1,3 +1,5 @@
+import math
+
 import numpy
   
 from scipy.optimize import curve_fit
@@ -306,68 +308,58 @@ def saveSurvivalCounts(tracks, filePrefix, maxSize=0):
   with open(fileName, 'w') as fp:
     fp.write('%s\n' % ','.join(['%d' % survivalCount for survivalCount in survivalCounts]))
 
-"""
 def _fitSurvival(xdata, *params):
 
-  #A, B = params[:2]
-  #tau1, tau2 = params[2:4]
-  #A = params[0]
-  #B = 1 - A
-  #tau1, tau2 = params[1:3]
-  #ydata = A * numpy.exp(-xdata/tau1) + B * numpy.exp(-xdata/tau2)
-
-  nexps = (1+len(params)) // 2
-  #nexps = len(params) // 2
-  #nexps = (len(params) - 1) // 2
+  nexps = len(params) // 2
   params = list(params)
-  if nexps == 1:
-    params.insert(0, 1.0)
-  else:
-    params.insert(nexps-1, 1-sum(params[:nexps-1]))
 
   ydata = numpy.zeros(len(xdata), dtype='float32')
   for i in range(nexps):
-    ydata += params[i] * numpy.exp(-xdata/params[i+nexps])
-    ###ydata += params[i] * xdata * xdata * numpy.exp(-xdata*xdata/params[i+nexps])
+    ydata += params[i] * numpy.exp(-xdata*params[i+nexps])
 
   return ydata
 
-def fitSurvivalCounts(tracks, filePrefix, numberExponentials=1):
+def _initialFitParameterEstimate(ydata):
+  
+  # assumes ydata[0] > 0 (in fact it is 1.0)
+  a = ydata[0]
+  b = 0.0
+  for m in range(min(len(ydata)-1, 10), 0, -1):
+    if ydata[m] > 0:
+      b = math.log(ydata[0] / ydata[m]) / m
+      break
+      
+  return (a, b)
+      
+def fitSurvivalCounts(tracks, filePrefix, maxNumberExponentials=1, plotDpi=600):
   
   survivalCounts = _getSurvivalCounts(tracks)
   
-  ydata = survivalCounts / survivalCounts[0]
-  xdata = 1 + numpy.arange(len(ydata))
+  ydata = survivalCounts.astype('float32')
+  ydata /= ydata[0]
+  xdata = numpy.arange(len(ydata))
   
-  r = 1.0 / numberExponentials
-
-  params0 = (numberExponentials-1)*[r] + numberExponentials*[0.1]
-  print('params0', numberExponentials, params0)
-
-  #bounds0 = (numberExponentials-1)*[0] + numberExponentials*[0.0]
-  #bounds1 = (numberExponentials-1)*[1] + numberExponentials*[numpy.inf]
-  #bounds = (bounds0, bounds1)
-  #popt, pcov = curve_fit(f, xdata, ydata, p0=p0, bounds=bounds)
-  params_opt, params_cov = curve_fit(_fitSurvival, xdata, ydata, p0=params0)
-
-  params = list(params_opt)
-  if numberExponentials == 1:
-    params.insert(0, 1.0)
-  else:
-    params.insert(numberExponentials-1, 1-sum(params[:numberExponentials-1]))
-  params = tuple(params)
-  #print('A=%f, B=%f, tau1=%f, tau2=%f' % params)
-  #print('params', nexps, popt)
-  print('params', numberExponentials, params)
-
-  yfit = f(xdata, *popt)
-  plt.plot(xdata, yfit, color=colors[nexps])
+  params0 = _initialFitParameterEstimate(ydata)
   
-  fileName = '%s_survivalCounts.csv' % filePrefix
-  with open(fileName, 'w') as fp:
-    fp.write('%s\n' % ','.join(['%d' % survivalCount for survivalCount in survivalCounts]))
-"""
+  params_list = []
+  for numberExponentials in range(1, maxNumberExponentials+1):
+    params_opt, params_cov = curve_fit(_fitSurvival, xdata, ydata, p0=params0)
+    ss = '' if numberExponentials == 1 else 's'
+    print('Fitting survival counts with %d exponential%s: %s' % (numberExponentials, ss, params_opt))
+    params_list.append(tuple(params_opt))
+    params0 = list(params_opt[:numberExponentials]) + [0.1] + list(params_opt[numberExponentials:]) + [0.0]
     
+  colors = ['blue', 'red', 'green', 'yellow', 'black']  # assumes no more than 4 exponentials
+  plt.plot(xdata, ydata, color=colors[-1])
+  for n in range(maxNumberExponentials):
+    yfit = ydata[0] * _fitSurvival(xdata, *params_list[n])
+    plt.plot(xdata, yfit, color=colors[n])
+  
+  fileName = '%s_survivalCountsFit.png' % filePrefix
+  plt.savefig(fileName, dpi=plotDpi, transparent=True)
+  #plt.show()
+  plt.close()
+      
 if __name__ == '__main__':
 
   import os
