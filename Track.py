@@ -345,14 +345,17 @@ def fitSurvivalCounts(tracks, filePrefix, maxNumberExponentials=1, plotDpi=600):
   for numberExponentials in range(1, maxNumberExponentials+1):
     params_opt, params_cov = curve_fit(_fitSurvival, xdata, ydata, p0=params0)
     ss = '' if numberExponentials == 1 else 's'
-    print('Fitting survival counts with %d exponential%s: %s' % (numberExponentials, ss, params_opt))
-    params_list.append(tuple(params_opt))
+    params_opt = tuple(params_opt)
+    yfit = _fitSurvival(xdata, *params_opt)
+    rss = numpy.sum((yfit - ydata)**2)
+    print('Fitting survival counts with %d exponential%s, parameters = %s, rss = %f' % (numberExponentials, ss, params_opt, rss))
+    params_list.append(params_opt)
     params0 = list(params_opt[:numberExponentials]) + [0.1] + list(params_opt[numberExponentials:]) + [0.0]
     
   colors = ['blue', 'red', 'green', 'yellow', 'black']  # assumes no more than 4 exponentials
   plt.plot(xdata, ydata, color=colors[-1])
   for n in range(maxNumberExponentials):
-    yfit = ydata[0] * _fitSurvival(xdata, *params_list[n])
+    yfit = _fitSurvival(xdata, *params_list[n])
     plt.plot(xdata, yfit, color=colors[n])
   
   fileName = '%s_survivalCountsFit.png' % filePrefix
