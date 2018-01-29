@@ -331,6 +331,27 @@ def _initialFitParameterEstimate(ydata):
       
   return (a, b)
       
+def _bootstrapFit(xdata, ydata, params_opt, ntrials=1000):
+  
+  ndata = len(xdata)
+  paramsList =  []
+  for trial in range(ntrials):
+    indices = range(ndata)
+    indices = numpy.random.choice(indices, ndata)
+    x = xdata[indices]
+    y = ydata[indices]
+    try:
+      params, params_cov = curve_fit(_fitSurvival, x, y, p0=params_opt)
+    except: # fit might fail
+      pass
+    paramsList.append(params)
+    
+  paramsArray = numpy.array(paramsList)
+  paramsMean = numpy.mean(paramsArray, axis=0)
+  paramsStd = numpy.std(paramsArray, axis=0)
+  print('Bootstrap parameter mean = %s' % paramsMean)
+  print('Bootstrap parameter standard deviation = %s' % paramsStd)
+    
 def fitSurvivalCounts(tracks, filePrefix, maxNumberExponentials=1, plotDpi=600):
   
   survivalCounts = _getSurvivalCounts(tracks)
@@ -345,10 +366,12 @@ def fitSurvivalCounts(tracks, filePrefix, maxNumberExponentials=1, plotDpi=600):
   for numberExponentials in range(1, maxNumberExponentials+1):
     params_opt, params_cov = curve_fit(_fitSurvival, xdata, ydata, p0=params0)
     ss = '' if numberExponentials == 1 else 's'
+    params_err = numpy.sqrt(numpy.diag(params_cov))
     params_opt = tuple(params_opt)
     yfit = _fitSurvival(xdata, *params_opt)
     rss = numpy.sum((yfit - ydata)**2)
-    print('Fitting survival counts with %d exponential%s, parameters = %s, rss = %f' % (numberExponentials, ss, params_opt, rss))
+    print('Fitting survival counts with %d exponential%s, parameters = %s, parameter standard deviation = %s, rss = %f' % (numberExponentials, ss, params_opt, params_err, rss))
+    _bootstrapFit(xdata, ydata, params_opt)
     params_list.append(params_opt)
     params0 = list(params_opt[:numberExponentials]) + [0.1] + list(params_opt[numberExponentials:]) + [0.0]
     
