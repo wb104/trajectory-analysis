@@ -8,7 +8,8 @@ DESCRIPTION = 'Analysis of trajectories for cell image data'
     
 def main():
   
-  SUFFIX = '.txt'
+  SUFFIX2D = '.txt'
+  SUFFIX3D = '.csv'
   
   from argparse import ArgumentParser
   
@@ -18,7 +19,7 @@ def main():
                              epilog=epilog, prefix_chars='-', add_help=True)
                              
   arg_parse.add_argument('directories', nargs='+',
-                         help='Directories containing *%s files to be analysed' % SUFFIX)
+                         help='Directories containing *%s (or *%s) files to be analysed' % (SUFFIX2D, SUFFIX3D))
 
   arg_parse.add_argument('-numDimensions', default=2, type=int,
                          help='Number of dimensions for the tracks (2 or 3)')
@@ -50,6 +51,9 @@ def main():
   arg_parse.add_argument('-saveNumTracksInBin', default=0, type=int,
                          help='Save number of tracks in each bin with maximum number for color being specified by given value, -1 means use maximum number of tracks in any bin')
   
+  arg_parse.add_argument('-minNumTracksColorInBin', default=0, type=int,
+                         help='Specify minimum number number of tracks in each bin for start color')
+  
   arg_parse.add_argument('-calcFramesByBinPercentage', default=0, type=float,
                          help='Calculate binned track (average) frames length which is >= than specified percentage over all tracks')
   
@@ -72,12 +76,14 @@ def main():
 
   assert args.numDimensions in (2, 3), 'numDimensions = %d, must be in (2, 3)' % args.numDimensions
 
+  suffix = SUFFIX2D if args.numDimensions == 2 else SUFFIX3D
+  
   for directory in args.directories:
     print('Processing directory %s' % directory)
     relfileNames = os.listdir(directory)
-    relfileNames = [relfileName for relfileName in relfileNames if relfileName.endswith(SUFFIX)]
+    relfileNames = [relfileName for relfileName in relfileNames if relfileName.endswith(suffix)]
     for relfileName in relfileNames:
-      filePrefix = os.path.join(directory, relfileName[:-len(SUFFIX)])
+      filePrefix = os.path.join(directory, relfileName[:-len(suffix)])
       fileName = os.path.join(directory, relfileName)
       print('Determining tracks for %s' % fileName)
       tracks = Track.determineTracks(fileName, args.numDimensions, args.maxJumpDistance, args.maxFrameGap, args.minNumPositions)
@@ -96,7 +102,7 @@ def main():
           value = Track.calcMaxNumTracksInBin(tracks, args.binSize)
         else:
           value = args.saveNumTracksInBin
-        Track.saveNumTracksInBin(tracks, filePrefix, args.binSize, value, args.plotDpi)
+        Track.saveNumTracksInBin(tracks, filePrefix, args.binSize, args.minNumTracksColorInBin, value, args.plotDpi)
         
       if args.calcFramesByBinPercentage > 0:
         Track.calcFramesByBinPercentage(tracks, args.binSize, args.calcFramesByBinPercentage)

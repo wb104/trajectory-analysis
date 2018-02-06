@@ -1,4 +1,5 @@
 import math
+import os
 
 import numpy
   
@@ -90,12 +91,14 @@ def determineTracks(fileName, numDimensions, maxJumpDistance, maxFrameGap, minNu
       if numDimensions == 2:
         (x, y, frame, intensity) = line.rstrip().split()[:4]
         position = numpy.array((float(x), float(y)))
+        base = 0
       elif numDimensions == 3:
-        (x, y, z, frame, intensity) = line.rstrip().split()[:5]
+        #(x, y, z, frame, intensity) = line.rstrip().split()[:5]
+        (frame, junk, x, y, z, junk, junk, junk, intensity, base) = line.rstrip().split()[:10]
         position = numpy.array((float(x), float(y), float(z)))
 
       frame = int(frame)
-      intensity = float(intensity)
+      intensity = float(intensity) - float(base)
     
       _processPosition(finishedTracks, currentTracks, position, frame, intensity, maxJumpDistance, maxFrameGap)
       
@@ -156,23 +159,34 @@ def calcMaxNumTracksInBin(tracks, binSize):
   
   return result
   
-def saveNumTracksInBin(tracks, filePrefix, binSize, maxValue, plotDpi):
+def _determineOutputFileName(filePrefix, name):
+  
+  dirName = os.path.dirname(filePrefix) + '_out'
+  baseName = os.path.basename(filePrefix)
+  if not os.path.exists(dirName):
+    os.mkdir(dirName)
+  
+  fileName = '%s/%s_%s' % (dirName, baseName, name)
+  
+  return fileName
+  
+def saveNumTracksInBin(tracks, filePrefix, binSize, minValue, maxValue, plotDpi):
   
   numTracks = _calcNumTracksByBin(tracks, binSize)
   
   cmap_name = COLOR1
-  imgplot = plt.imshow(numTracks, cmap=cmap_name, vmin=0, vmax=maxValue, interpolation='nearest')
+  imgplot = plt.imshow(numTracks, cmap=cmap_name, vmin=minValue, vmax=maxValue, interpolation='nearest')
   plt.xlim((0, len(numTracks[0]-1)))
   plt.ylim((len(numTracks)-1, 0))  # y axis is backwards
 
-  fileName = '%s_countHeat.png' % filePrefix
+  fileName = _determineOutputFileName(filePrefix, 'countHeat.png')
   plt.savefig(fileName, dpi=plotDpi, transparent=True)
   #plt.show()
   plt.close()
   
 def savePositionsFramesIntensities(tracks, filePrefix):
 
-  fileName = '%s_positionsFramesIntensity.csv' % filePrefix
+  fileName = _determineOutputFileName(filePrefix, 'positionsFramesIntensity.csv')
   with open(fileName, 'w') as fp:
     fp.write('# track, numberPositions, deltaFrames, averageIntensity (missing out first and last ones if >= 3 positions)\n')
     for n, track in enumerate(tracks):
@@ -252,7 +266,7 @@ def saveTrackFramesInBin(tracks, filePrefix, binSize, cutoffValue, plotDpi):
   plt.xlim((0, xSize-1))
   plt.ylim((ySize-1, 0))  # y axis is backwards
 
-  fileName = '%s_framesByBin.png' % filePrefix
+  fileName = _determineOutputFileName(filePrefix, 'framesByBin.png')
   plt.savefig(fileName, dpi=plotDpi, transparent=True)
   #plt.show()
   plt.close()
@@ -271,7 +285,7 @@ def saveTracksColoredByFrames(tracks, filePrefix, cutoffValue, plotDpi):
     
   plt.ylim(plt.ylim()[::-1])
   
-  fileName = '%s_tracksByFrames.png' % filePrefix
+  fileName = _determineOutputFileName(filePrefix, 'tracksByFrames.png')
   plt.savefig(fileName, dpi=plotDpi, transparent=True)
   #plt.show()
   plt.close()
@@ -284,7 +298,7 @@ def saveResidenceTimes(tracks, filePrefix):
   
   residenceTimes = _getResidenceTimes(tracks)
   
-  fileName = '%s_residenceTimes.csv' % filePrefix
+  fileName = _determineOutputFileName(filePrefix, 'residenceTimes.csv')
   with open(fileName, 'w') as fp:
     fp.write('%s\n' % ','.join(['%d' % residenceTime for residenceTime in residenceTimes]))
   
@@ -304,7 +318,7 @@ def saveSurvivalCounts(tracks, filePrefix, maxSize=0):
   
   survivalCounts = _getSurvivalCounts(tracks, maxSize)
   
-  fileName = '%s_survivalCounts.csv' % filePrefix
+  fileName = _determineOutputFileName(filePrefix, 'survivalCounts.csv')
   with open(fileName, 'w') as fp:
     fp.write('%s\n' % ','.join(['%d' % survivalCount for survivalCount in survivalCounts]))
 
@@ -330,7 +344,21 @@ def _initialFitParameterEstimate(ydata):
       break
       
   return (a, b)
-      
+    
+def _adjustedParams(params):
+  
+  # if fit is A exp(-B x) + c exp(-D x) then parameters go from
+  # (A, C, B, D) to (A/(A+C), 1/B, C/(A+C), 1/D)
+  
+  numberExponentials = len(params) // 2
+  s = sum(params[:numberExponentials])
+  paramsNew = (2*numberExponentials)*[0]
+  for i in range(numberExponentials):
+    paramsNew[2*i] = params[i] / s
+    paramsNew[2*i+1] = 1 / params[i+numberExponentials]
+    
+  return paramsNew
+  
 def _bootstrapFit(xdata, ydata, params_opt, ntrials=1000):
   
   ndata = len(xdata)
@@ -344,14 +372,33 @@ def _bootstrapFit(xdata, ydata, params_opt, ntrials=1000):
       params, params_cov = curve_fit(_fitSurvival, x, y, p0=params_opt)
     except: # fit might fail
       pass
+    params = _adjustedParams(params)
     paramsList.append(params)
     
   paramsArray = numpy.array(paramsList)
   paramsMean = numpy.mean(paramsArray, axis=0)
   paramsStd = numpy.std(paramsArray, axis=0)
-  print('Bootstrap parameter mean = %s' % paramsMean)
-  print('Bootstrap parameter standard deviation = %s' % paramsStd)
+  #print('Bootstrap parameter mean = %s' % paramsMean)
+  #print('Bootstrap parameter standard deviation = %s' % paramsStd)
+  
+  return paramsStd
     
+def _writeParams(fp, params, paramsStd, rss, maxNumberExponentials):
+  
+  numberExponentials = len(params) // 2
+  params = _adjustedParams(params)
+  data = ['%d' % numberExponentials]
+  data.extend(['%.3f' % param for param in params])
+  n = 2 * (maxNumberExponentials - numberExponentials)
+  data.extend(n*[''])
+  data.extend(['%.3f' % param for param in paramsStd])
+  data.extend(n*[''])
+  data.append('%.3f' % rss)
+    
+  data = ','.join(data)
+  
+  fp.write(data + '\n')
+  
 def fitSurvivalCounts(tracks, filePrefix, maxNumberExponentials=1, plotDpi=600):
   
   survivalCounts = _getSurvivalCounts(tracks)
@@ -362,18 +409,21 @@ def fitSurvivalCounts(tracks, filePrefix, maxNumberExponentials=1, plotDpi=600):
   
   params0 = _initialFitParameterEstimate(ydata)
   
-  params_list = []
-  for numberExponentials in range(1, maxNumberExponentials+1):
-    params_opt, params_cov = curve_fit(_fitSurvival, xdata, ydata, p0=params0)
-    ss = '' if numberExponentials == 1 else 's'
-    params_err = numpy.sqrt(numpy.diag(params_cov))
-    params_opt = tuple(params_opt)
-    yfit = _fitSurvival(xdata, *params_opt)
-    rss = numpy.sum((yfit - ydata)**2)
-    print('Fitting survival counts with %d exponential%s, parameters = %s, parameter standard deviation = %s, rss = %f' % (numberExponentials, ss, params_opt, params_err, rss))
-    _bootstrapFit(xdata, ydata, params_opt)
-    params_list.append(params_opt)
-    params0 = list(params_opt[:numberExponentials]) + [0.1] + list(params_opt[numberExponentials:]) + [0.0]
+  fileName = _determineOutputFileName(filePrefix, 'fitSurvivalCounts.csv')
+  with open(fileName, 'w') as fp:
+    params_list = []
+    for numberExponentials in range(1, maxNumberExponentials+1):
+      params_opt, params_cov = curve_fit(_fitSurvival, xdata, ydata, p0=params0)
+      ss = '' if numberExponentials == 1 else 's'
+      params_err = numpy.sqrt(numpy.diag(params_cov))
+      params_opt = tuple(params_opt)
+      yfit = _fitSurvival(xdata, *params_opt)
+      rss = numpy.sum((yfit - ydata)**2)
+      print('Fitting survival counts with %d exponential%s, parameters = %s, parameter standard deviation = %s, rss = %f' % (numberExponentials, ss, params_opt, params_err, rss))
+      paramsStd = _bootstrapFit(xdata, ydata, params_opt)
+      _writeParams(fp, params_opt, paramsStd, rss, maxNumberExponentials)
+      params_list.append(params_opt)
+      params0 = list(params_opt[:numberExponentials]) + [0.1] + list(params_opt[numberExponentials:]) + [0.0]
     
   colors = ['blue', 'red', 'green', 'yellow', 'black']  # assumes no more than 4 exponentials
   plt.plot(xdata, ydata, color=colors[-1])
@@ -381,7 +431,7 @@ def fitSurvivalCounts(tracks, filePrefix, maxNumberExponentials=1, plotDpi=600):
     yfit = _fitSurvival(xdata, *params_list[n])
     plt.plot(xdata, yfit, color=colors[n])
   
-  fileName = '%s_survivalCountsFit.png' % filePrefix
+  fileName = _determineOutputFileName(filePrefix, 'survivalCountsFit.png')
   plt.savefig(fileName, dpi=plotDpi, transparent=True)
   #plt.show()
   plt.close()
