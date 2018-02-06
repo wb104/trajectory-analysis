@@ -94,7 +94,7 @@ def determineTracks(fileName, numDimensions, maxJumpDistance, maxFrameGap, minNu
         base = 0
       elif numDimensions == 3:
         #(x, y, z, frame, intensity) = line.rstrip().split()[:5]
-        (frame, junk, x, y, z, junk, junk, junk, intensity, base) = line.rstrip().split()[:10]
+        (frame, junk, x, y, z, junk, junk, junk, intensity, base) = line.rstrip().split(',')[:10]
         position = numpy.array((float(x), float(y), float(z)))
 
       frame = int(frame)
