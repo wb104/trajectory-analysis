@@ -49,7 +49,7 @@ def main():
                          help='Calculate maximum number of tracks in any bin')
   
   arg_parse.add_argument('-saveNumTracksInBin', default=0, type=int,
-                         help='Save number of tracks in each bin with maximum number for color being specified by given value, -1 means use maximum number of tracks in any bin')
+                         help='Save number of tracks in each bin (as a plot, saved as png) with maximum number for color being specified by given value, -1 means use maximum number of tracks in any bin')
   
   arg_parse.add_argument('-minNumTracksColorInBin', default=0, type=int,
                          help='Specify minimum number number of tracks in each bin for start color')
@@ -58,10 +58,10 @@ def main():
                          help='Calculate binned track (average) frames length which is >= than specified percentage over all tracks')
   
   arg_parse.add_argument('-saveTrackFramesInBin', default=0, type=int,
-                         help='Save track (average) frames in each bin with maximum number for color being specified by given value, -1 means use maximum number of (average) frames in any bin')
+                         help='Save track (average) frames in each bin (as a plot, saved as png) with maximum number for color being specified by given value, -1 means use maximum number of (average) frames in any bin')
   
   arg_parse.add_argument('-saveTracksColoredByFrames', default=0, type=int,
-                         help='Save tracks where those with frames >= specified value are colored blue and others yellow')
+                         help='Save tracks (as a plot, saved as png) where those with frames >= specified value are colored blue and others yellow')
                              
   arg_parse.add_argument('-saveResidenceTimes', default=False, action='store_true',
                          help='Save residence times to a csv file')
