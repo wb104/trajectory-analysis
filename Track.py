@@ -385,17 +385,39 @@ def _bootstrapFit(xdata, ydata, params_opt, ntrials=1000, fp=None):
   
   return paramsStd
     
-def _writeParams(fp, params, paramsStd, rss, maxNumberExponentials):
+def _writeFitHeader(fp, maxNumberExponentials):
+  
+  data = ['nexp']
+  for m in range(maxNumberExponentials):
+    data.append('ampl%d' % (m+1))
+    data.append('T%d' % (m+1))
+  for m in range(maxNumberExponentials):
+    data.append('amplErr%d' % (m+1))
+    data.append('TErr%d' % (m+1))
+  data.append('rss')
+  data.append('bic')
+    
+  data = ','.join(data)
+  
+  fp.write(data + '\n')
+    
+def _writeFitParams(fp, params, paramsStd, rss, maxNumberExponentials, ndata):
   
   numberExponentials = len(params) // 2
   params = _adjustedParams(params)
+  n = 2 * (maxNumberExponentials - numberExponentials)
+  
   data = ['%d' % numberExponentials]
   data.extend(['%.3f' % param for param in params])
-  n = 2 * (maxNumberExponentials - numberExponentials)
   data.extend(n*[''])
+  
   data.extend(['%.3f' % param for param in paramsStd])
   data.extend(n*[''])
+  
   data.append('%.3f' % rss)
+  
+  bic = numpy.log(ndata) * (len(params) + 1) + ndata * (numpy.log(2*numpy.pi*rss/ndata) + 1)
+  data.append('%.3f' % bic)
     
   data = ','.join(data)
   
@@ -413,6 +435,7 @@ def fitSurvivalCounts(tracks, filePrefix, maxNumberExponentials=1, plotDpi=600):
   
   fileName = _determineOutputFileName(filePrefix, 'fitSurvivalCounts.csv')
   with open(fileName, 'w') as fp:
+    _writeFitHeader(fp, maxNumberExponentials)
     params_list = []
     for numberExponentials in range(1, maxNumberExponentials+1):
       params_opt, params_cov = curve_fit(_fitSurvival, xdata, ydata, p0=params0)
@@ -425,7 +448,7 @@ def fitSurvivalCounts(tracks, filePrefix, maxNumberExponentials=1, plotDpi=600):
       fileNameBootstrap = _determineOutputFileName(filePrefix, 'bootstrapParams_%d.csv' % numberExponentials)
       with open(fileNameBootstrap, 'w') as fpBootstrap:
         paramsStd = _bootstrapFit(xdata, ydata, params_opt, fp=fpBootstrap)
-      _writeParams(fp, params_opt, paramsStd, rss, maxNumberExponentials)
+      _writeFitParams(fp, params_opt, paramsStd, rss, maxNumberExponentials, len(xdata))
       params_list.append(params_opt)
       params0 = list(params_opt[:numberExponentials]) + [0.1] + list(params_opt[numberExponentials:]) + [0.0]
     
