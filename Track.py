@@ -322,7 +322,7 @@ def saveSurvivalCounts(tracks, filePrefix, maxSize=0):
   with open(fileName, 'w') as fp:
     fp.write('%s\n' % ','.join(['%d' % survivalCount for survivalCount in survivalCounts]))
 
-def _fitSurvival(xdata, *params):
+def _fitExponentials(xdata, *params):
 
   nexps = len(params) // 2
   params = list(params)
@@ -333,7 +333,7 @@ def _fitSurvival(xdata, *params):
 
   return ydata
 
-def _initialFitParameterEstimate(ydata):
+def _initialFitSurvivalParameterEstimate(ydata):
   
   # assumes ydata[0] > 0 (in fact it is 1.0)
   a = ydata[0]
@@ -345,7 +345,7 @@ def _initialFitParameterEstimate(ydata):
       
   return (a, b)
     
-def _adjustedParams(params):
+def _adjustedSurvivalParams(params):
   
   # if fit is A exp(-B x) + c exp(-D x) then parameters go from
   # (A, C, B, D) to (A/(A+C), 1/B, C/(A+C), 1/D)
@@ -359,7 +359,7 @@ def _adjustedParams(params):
     
   return paramsNew
   
-def _bootstrapFit(xdata, ydata, params_opt, ntrials=1000, fp=None):
+def _bootstrapFit(xdata, ydata, params_opt, fitFunc, adjustedParamsFunc=None, ntrials=1000, fp=None):
   
   ndata = len(xdata)
   paramsList =  []
@@ -369,10 +369,11 @@ def _bootstrapFit(xdata, ydata, params_opt, ntrials=1000, fp=None):
     x = xdata[indices]
     y = ydata[indices]
     try:
-      params, params_cov = curve_fit(_fitSurvival, x, y, p0=params_opt)
+      params, params_cov = curve_fit(fitFunc, x, y, p0=params_opt)
     except: # fit might fail
       pass
-    params = _adjustedParams(params)
+    if adjustedParamsFunc:
+      params = adjustedParamsFunc(params)
     if fp:
       fp.write('%s\n' % ','.join(['%.3f' % p for p in params]))
     paramsList.append(params)
@@ -385,7 +386,7 @@ def _bootstrapFit(xdata, ydata, params_opt, ntrials=1000, fp=None):
   
   return paramsStd
     
-def _writeFitHeader(fp, maxNumberExponentials):
+def _writeFitSurvivalHeader(fp, maxNumberExponentials):
   
   data = ['nexp']
   for m in range(maxNumberExponentials):
@@ -401,10 +402,10 @@ def _writeFitHeader(fp, maxNumberExponentials):
   
   fp.write(data + '\n')
     
-def _writeFitParams(fp, params, paramsStd, rss, maxNumberExponentials, ndata):
+def _writeFitSurvivalParams(fp, params, paramsStd, rss, maxNumberExponentials, ndata):
   
   numberExponentials = len(params) // 2
-  params = _adjustedParams(params)
+  params = _adjustedSurvivalParams(params)
   n = 2 * (maxNumberExponentials - numberExponentials)
   
   data = ['%d' % numberExponentials]
@@ -431,38 +432,39 @@ def fitSurvivalCounts(tracks, filePrefix, maxNumberExponentials=1, plotDpi=600):
   ydata /= ydata[0]
   xdata = numpy.arange(len(ydata))
   
-  params0 = _initialFitParameterEstimate(ydata)
+  params0 = _initialFitSurvivalParameterEstimate(ydata)
   
   fileName = _determineOutputFileName(filePrefix, 'fitSurvivalCounts.csv')
   with open(fileName, 'w') as fp:
-    _writeFitHeader(fp, maxNumberExponentials)
+    _writeFitSurvivalHeader(fp, maxNumberExponentials)
     params_list = []
     for numberExponentials in range(1, maxNumberExponentials+1):
-      params_opt, params_cov = curve_fit(_fitSurvival, xdata, ydata, p0=params0)
+      params_opt, params_cov = curve_fit(_fitExponentials, xdata, ydata, p0=params0)
       ss = '' if numberExponentials == 1 else 's'
       params_err = numpy.sqrt(numpy.diag(params_cov))
       params_opt = tuple(params_opt)
-      yfit = _fitSurvival(xdata, *params_opt)
+      yfit = _fitExponentials(xdata, *params_opt)
       rss = numpy.sum((yfit - ydata)**2)
       print('Fitting survival counts with %d exponential%s, parameters = %s, parameter standard deviation = %s, rss = %f' % (numberExponentials, ss, params_opt, params_err, rss))
-      fileNameBootstrap = _determineOutputFileName(filePrefix, 'bootstrapParams_%d.csv' % numberExponentials)
-      with open(fileNameBootstrap, 'w') as fpBootstrap:
-        paramsStd = _bootstrapFit(xdata, ydata, params_opt, fp=fpBootstrap)
-      _writeFitParams(fp, params_opt, paramsStd, rss, maxNumberExponentials, len(xdata))
+      #fileNameBootstrap = _determineOutputFileName(filePrefix, 'bootstrapParams_%d.csv' % numberExponentials)
+      #with open(fileNameBootstrap, 'w') as fpBootstrap:
+      #  paramsStd = _bootstrapFit(xdata, ydata, params_opt, fp=fpBootstrap)
+      paramsStd = _bootstrapFit(xdata, ydata, params_opt, _fitExponentials, _adjustedSurvivalParams)
+      _writeFitSurvivalParams(fp, params_opt, paramsStd, rss, maxNumberExponentials, len(xdata))
       params_list.append(params_opt)
       params0 = list(params_opt[:numberExponentials]) + [0.1] + list(params_opt[numberExponentials:]) + [0.0]
     
   colors = ['blue', 'red', 'green', 'yellow', 'black']  # assumes no more than 4 exponentials
   plt.plot(xdata, ydata, color=colors[-1])
   for n in range(maxNumberExponentials):
-    yfit = _fitSurvival(xdata, *params_list[n])
+    yfit = _fitExponentials(xdata, *params_list[n])
     plt.plot(xdata, yfit, color=colors[n])
   
   fileName = _determineOutputFileName(filePrefix, 'survivalCountsFit.png')
   plt.savefig(fileName, dpi=plotDpi, transparent=True)
   #plt.show()
   plt.close()
-      
+            
 if __name__ == '__main__':
 
   import os
