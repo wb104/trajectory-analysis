@@ -1,3 +1,4 @@
+import functools
 import math
 import os
 
@@ -306,11 +307,13 @@ def _getSurvivalCounts(tracks, maxSize=0):
 
   residenceTimes = _getResidenceTimes(tracks)
   if maxSize == 0:
-    maxSize = max(residenceTimes)
+    #maxSize = max(residenceTimes)
+    maxSize = 1 + max(residenceTimes)
   survivalCounts = numpy.zeros(maxSize, dtype='int32')
   ones = numpy.ones(maxSize, dtype='int32')
   for residenceTime in residenceTimes:
-    survivalCounts[:residenceTime] += ones[:residenceTime]
+    #survivalCounts[:residenceTime] += ones[:residenceTime]
+    survivalCounts[:1+residenceTime] += ones[:1+residenceTime]
     
   return survivalCounts
   
@@ -322,7 +325,7 @@ def saveSurvivalCounts(tracks, filePrefix, maxSize=0):
   with open(fileName, 'w') as fp:
     fp.write('%s\n' % ','.join(['%d' % survivalCount for survivalCount in survivalCounts]))
 
-def _fitExponentials(xdata, *params):
+def _fitExponentials(fitUsingLog, xdata, *params):
 
   nexps = len(params) // 2
   params = list(params)
@@ -331,8 +334,11 @@ def _fitExponentials(xdata, *params):
   for i in range(nexps):
     ydata += params[i] * numpy.exp(-xdata*params[i+nexps])
 
-  return ydata
-
+  if fitUsingLog:
+    return numpy.log(ydata)
+  else:
+    return ydata
+    
 def _initialFitSurvivalParameterEstimate(ydata):
   
   # assumes ydata[0] > 0 (in fact it is 1.0)
@@ -347,7 +353,7 @@ def _initialFitSurvivalParameterEstimate(ydata):
     
 def _adjustedSurvivalParams(params):
   
-  # if fit is A exp(-B x) + c exp(-D x) then parameters go from
+  # if fit is A exp(-B x) + C exp(-D x) then parameters go from
   # (A, C, B, D) to (A/(A+C), 1/B, C/(A+C), 1/D)
   
   numberExponentials = len(params) // 2
@@ -359,7 +365,7 @@ def _adjustedSurvivalParams(params):
     
   return paramsNew
   
-def _bootstrapFit(xdata, ydata, params_opt, fitFunc, adjustedParamsFunc=None, ntrials=1000, fp=None):
+def _bootstrapFit(xdata, ydata, params_opt, fitFunc, fitUsingLogData=False, adjustedParamsFunc=None, ntrials=1000, fp=None):
   
   ndata = len(xdata)
   paramsList =  []
@@ -367,11 +373,11 @@ def _bootstrapFit(xdata, ydata, params_opt, fitFunc, adjustedParamsFunc=None, nt
     indices = range(ndata)
     indices = numpy.random.choice(indices, ndata)
     x = xdata[indices]
-    y = ydata[indices]
+    y = numpy.log(ydata[indices]) if fitUsingLogData else ydata[indices]
     try:
       params, params_cov = curve_fit(fitFunc, x, y, p0=params_opt)
     except: # fit might fail
-      pass
+      continue
     if adjustedParamsFunc:
       params = adjustedParamsFunc(params)
     if fp:
@@ -424,13 +430,18 @@ def _writeFitSurvivalParams(fp, params, paramsStd, rss, maxNumberExponentials, n
   
   fp.write(data + '\n')
   
-def fitSurvivalCounts(tracks, filePrefix, maxNumberExponentials=1, plotDpi=600):
+def fitSurvivalCounts(tracks, filePrefix, maxNumberExponentials=1, minNumPositions=2, fitUsingLogData=False, plotDpi=600):
   
   survivalCounts = _getSurvivalCounts(tracks)
+  
+  survivalCounts = survivalCounts[minNumPositions-1:]
   
   ydata = survivalCounts.astype('float32')
   ydata /= ydata[0]
   xdata = numpy.arange(len(ydata))
+  
+  data = numpy.log(ydata) if fitUsingLogData else ydata
+  fitFunc = functools.partial(_fitExponentials, fitUsingLogData)
   
   params0 = _initialFitSurvivalParameterEstimate(ydata)
   
@@ -439,17 +450,20 @@ def fitSurvivalCounts(tracks, filePrefix, maxNumberExponentials=1, plotDpi=600):
     _writeFitSurvivalHeader(fp, maxNumberExponentials)
     params_list = []
     for numberExponentials in range(1, maxNumberExponentials+1):
-      params_opt, params_cov = curve_fit(_fitExponentials, xdata, ydata, p0=params0)
+      #params_opt, params_cov = curve_fit(_fitExponentials, xdata, ydata, p0=params0)
+      params_opt, params_cov = curve_fit(fitFunc, xdata, data, p0=params0)
       ss = '' if numberExponentials == 1 else 's'
       params_err = numpy.sqrt(numpy.diag(params_cov))
       params_opt = tuple(params_opt)
-      yfit = _fitExponentials(xdata, *params_opt)
+      yfit = _fitExponentials(fitUsingLogData, xdata, *params_opt)
+      if fitUsingLogData:
+        yfit = numpy.exp(yfit)
       rss = numpy.sum((yfit - ydata)**2)
       print('Fitting survival counts with %d exponential%s, parameters = %s, parameter standard deviation = %s, rss = %f' % (numberExponentials, ss, params_opt, params_err, rss))
       #fileNameBootstrap = _determineOutputFileName(filePrefix, 'bootstrapParams_%d.csv' % numberExponentials)
       #with open(fileNameBootstrap, 'w') as fpBootstrap:
       #  paramsStd = _bootstrapFit(xdata, ydata, params_opt, fp=fpBootstrap)
-      paramsStd = _bootstrapFit(xdata, ydata, params_opt, _fitExponentials, _adjustedSurvivalParams)
+      paramsStd = _bootstrapFit(xdata, ydata, params_opt, fitFunc, fitUsingLogData, _adjustedSurvivalParams)
       _writeFitSurvivalParams(fp, params_opt, paramsStd, rss, maxNumberExponentials, len(xdata))
       params_list.append(params_opt)
       params0 = list(params_opt[:numberExponentials]) + [0.1] + list(params_opt[numberExponentials:]) + [0.0]
@@ -457,13 +471,22 @@ def fitSurvivalCounts(tracks, filePrefix, maxNumberExponentials=1, plotDpi=600):
   colors = ['blue', 'red', 'green', 'yellow', 'black']  # assumes no more than 4 exponentials
   plt.plot(xdata, ydata, color=colors[-1])
   for n in range(maxNumberExponentials):
-    yfit = _fitExponentials(xdata, *params_list[n])
+    yfit = _fitExponentials(fitUsingLogData, xdata, *params_list[n])
+    if fitUsingLogData:
+      yfit = numpy.exp(yfit)
     plt.plot(xdata, yfit, color=colors[n])
   
   fileName = _determineOutputFileName(filePrefix, 'survivalCountsFit.png')
   plt.savefig(fileName, dpi=plotDpi, transparent=True)
   #plt.show()
   plt.close()
+  
+  fileName = _determineOutputFileName(filePrefix, 'survivalCounts.csv')
+  with open(fileName, 'w') as fp:
+    fp.write('%s\n' % ','.join(['%s' % w for w in xdata]))
+    fp.write('%s\n' % ','.join(['%s' % w for w in survivalCounts]))
+    fp.write('%s\n' % ','.join(['%s' % w for w in ydata]))
+    fp.write('%s\n' % ','.join(['%s' % w for w in yfit]))
             
 if __name__ == '__main__':
 

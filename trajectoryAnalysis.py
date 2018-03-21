@@ -72,6 +72,9 @@ def main():
   arg_parse.add_argument('-fitSurvivalCounts', default=0, type=int,
                          help='Fit survival counts (how many tracks last at least a given amount) to specified number of exponentials, and save result to a csv file')
   
+  arg_parse.add_argument('-fitUsingLogData', default=False, action='store_true',
+                         help='Fit survival count using log of data (so later points count as much as early points)')
+  
   args = arg_parse.parse_args()
 
   assert args.numDimensions in (2, 3), 'numDimensions = %d, must be in (2, 3)' % args.numDimensions
@@ -124,7 +127,7 @@ def main():
         Track.saveSurvivalCounts(tracks, filePrefix, args.saveSurvivalCounts)
         
       if args.fitSurvivalCounts > 0:
-        Track.fitSurvivalCounts(tracks, filePrefix, args.fitSurvivalCounts, args.plotDpi)
+        Track.fitSurvivalCounts(tracks, filePrefix, args.fitSurvivalCounts, args.minNumPositions, args.fitUsingLogData, args.plotDpi)
         
 if __name__ == '__main__':
   
