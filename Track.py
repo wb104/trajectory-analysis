@@ -49,12 +49,18 @@ class Track:
   def deltaFrames(self):
     
     return self.frames[-1] - self.frames[0]
+    
+  def maxDistanceTravelled(self):
+    
+    distances = [_calcAdjustedDistance(self.positions[n], self.frames[n], self, 0) for n in range(1, len(self.positions))]
+    
+    return max(distances)
 
-def _calcAdjustedDistance(position, frame, track):
+def _calcAdjustedDistance(position, frame, track, trackPositionIndex=-1):
   
-  delta = position - track.positions[-1]
+  delta = position - track.positions[trackPositionIndex]
   #distance = numpy.sqrt(numpy.sum(delta*delta))
-  distance = numpy.sqrt(numpy.sum(delta*delta)) / numpy.sqrt(frame - track.frames[-1])
+  distance = numpy.sqrt(numpy.sum(delta*delta)) / numpy.sqrt(frame - track.frames[trackPositionIndex])
   
   return distance
   
@@ -278,7 +284,7 @@ def saveTracksColoredByFrames(tracks, filePrefix, cutoffValue, plotDpi):
     xpositions = [position[0] for position in track.positions]
     ypositions = [position[1] for position in track.positions]
     
-    if (track.frames[-1]-track.frames[0]) >= cutoffValue: # HACK
+    if track.deltaFrames() >= cutoffValue:
       color = COLOR2
     else:
       color = COLOR3
@@ -287,6 +293,25 @@ def saveTracksColoredByFrames(tracks, filePrefix, cutoffValue, plotDpi):
   plt.ylim(plt.ylim()[::-1])
   
   fileName = _determineOutputFileName(filePrefix, 'tracksByFrames.png')
+  plt.savefig(fileName, dpi=plotDpi, transparent=True)
+  #plt.show()
+  plt.close()
+  
+def saveTracksColoredByDistance(tracks, filePrefix, cutoffValue, plotDpi):
+  
+  for track in tracks:
+    xpositions = [position[0] for position in track.positions]
+    ypositions = [position[1] for position in track.positions]
+    
+    if track.maxDistanceTravelled() >= cutoffValue:
+      color = COLOR2
+    else:
+      color = COLOR3
+    plt.plot(xpositions, ypositions, color=color)
+    
+  plt.ylim(plt.ylim()[::-1])
+  
+  fileName = _determineOutputFileName(filePrefix, 'tracksByDistance.png')
   plt.savefig(fileName, dpi=plotDpi, transparent=True)
   #plt.show()
   plt.close()

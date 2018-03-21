@@ -63,6 +63,9 @@ def main():
   arg_parse.add_argument('-saveTracksColoredByFrames', default=0, type=int,
                          help='Save tracks (as a plot, saved as png) where those with frames >= specified value are colored blue and others yellow')
                              
+  arg_parse.add_argument('-saveTracksColoredByDistance', default=0, type=float,
+                         help='Save tracks (as a plot, saved as png) where those which ever travel >= specified value from start point are colored blue and others yellow')
+                             
   arg_parse.add_argument('-saveResidenceTimes', default=False, action='store_true',
                          help='Save residence times to a csv file')
                              
@@ -119,6 +122,9 @@ def main():
         
       if args.saveTracksColoredByFrames:
         Track.saveTracksColoredByFrames(tracks, filePrefix, args.saveTracksColoredByFrames, args.plotDpi)
+
+      if args.saveTracksColoredByDistance:
+        Track.saveTracksColoredByDistance(tracks, filePrefix, args.saveTracksColoredByDistance, args.plotDpi)
 
       if args.saveResidenceTimes:
         Track.saveResidenceTimes(tracks, filePrefix)
