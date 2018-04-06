@@ -399,8 +399,11 @@ def _bootstrapFit(xdata, ydata, params_opt, fitFunc, fitUsingLogData=False, adju
     indices = numpy.random.choice(indices, ndata)
     x = xdata[indices]
     y = numpy.log(ydata[indices]) if fitUsingLogData else ydata[indices]
+    bounds0 = (len(params_opt))*[0]
+    bounds1 = (len(params_opt))*[numpy.inf]
+    bounds = (bounds0, bounds1)
     try:
-      params, params_cov = curve_fit(fitFunc, x, y, p0=params_opt)
+      params, params_cov = curve_fit(fitFunc, x, y, p0=params_opt, bounds=bounds)
     except: # fit might fail
       continue
     if adjustedParamsFunc:
@@ -476,7 +479,10 @@ def fitSurvivalCounts(tracks, filePrefix, maxNumberExponentials=1, minNumPositio
     params_list = []
     for numberExponentials in range(1, maxNumberExponentials+1):
       #params_opt, params_cov = curve_fit(_fitExponentials, xdata, ydata, p0=params0)
-      params_opt, params_cov = curve_fit(fitFunc, xdata, data, p0=params0)
+      bounds0 = (len(params0))*[0]
+      bounds1 = (len(params0))*[numpy.inf]
+      bounds = (bounds0, bounds1)
+      params_opt, params_cov = curve_fit(fitFunc, xdata, data, p0=params0, bounds=bounds)
       ss = '' if numberExponentials == 1 else 's'
       params_err = numpy.sqrt(numpy.diag(params_cov))
       params_opt = tuple(params_opt)
