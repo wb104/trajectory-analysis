@@ -144,7 +144,7 @@ def _calcNumTracksByBin(tracks, binSize):
     yBin = int(yPosition / binSize)
     xBinMax = max(xBin, xBinMax)
     yBinMax = max(yBin, yBinMax)
-  
+    
   xSize = xBinMax + 1
   ySize = yBinMax + 1
   numTracks = numpy.zeros((ySize, xSize), dtype='int32')
@@ -181,10 +181,21 @@ def saveNumTracksInBin(tracks, filePrefix, binSize, minValue, maxValue, plotDpi)
   
   numTracks = _calcNumTracksByBin(tracks, binSize)
   
+  # TEMP HACK
+  fileName = _determineOutputFileName(filePrefix, 'numTracks.csv')
+  with open(fileName, 'w') as fp:
+    fp.write('# xBin, yBin, count\n')
+    for yBin in range(201):
+      for xBin in range(101):
+        if numTracks[yBin][xBin] > 0:
+          fp.write('%d,%d,%d\n' % (xBin, yBin, numTracks[yBin][xBin]))
+  
   cmap_name = COLOR1
+  plt.xlim((0, 100)) # TEMP HACK
+  plt.ylim((200, 0))  # y axis is backwards
   imgplot = plt.imshow(numTracks, cmap=cmap_name, vmin=minValue, vmax=maxValue, interpolation='nearest')
-  plt.xlim((0, len(numTracks[0]-1)))
-  plt.ylim((len(numTracks)-1, 0))  # y axis is backwards
+  #plt.xlim((0, len(numTracks[0]-1)))
+  #plt.ylim((len(numTracks)-1, 0))  # y axis is backwards
 
   fileName = _determineOutputFileName(filePrefix, 'countHeat.png')
   plt.savefig(fileName, dpi=plotDpi, transparent=True)
@@ -278,43 +289,63 @@ def saveTrackFramesInBin(tracks, filePrefix, binSize, cutoffValue, plotDpi):
   #plt.show()
   plt.close()
 
-def saveTracksColoredByFrames(tracks, filePrefix, cutoffValue, plotDpi):
+def saveTracksColoredByFrames(tracks, filePrefix, cutoffValue, plotDpi, numDimensions):
   
-  for track in tracks:
-    xpositions = [position[0] for position in track.positions]
-    ypositions = [position[1] for position in track.positions]
+  dims = [(0, 1)]
+  if numDimensions == 3:
+    dims.append((0, 2))
+    dims.append((1, 2))
     
-    if track.deltaFrames() >= cutoffValue:
-      color = COLOR2
+  for xDim, yDim in dims:
+    for track in tracks:
+      xpositions = [position[xDim] for position in track.positions]
+      ypositions = [position[yDim] for position in track.positions]
+    
+      if track.deltaFrames >= cutoffValue:
+        color = COLOR2
+      else:
+        color = COLOR3
+      plt.plot(xpositions, ypositions, color=color)
+    
+    plt.ylim(plt.ylim()[::-1])
+  
+    if numDimensions == 2:
+      d = ''
     else:
-      color = COLOR3
-    plt.plot(xpositions, ypositions, color=color)
+      d = '%d%d' % (xDim+1, yDim+1)
+    fileName = _determineOutputFileName(filePrefix, 'tracksByFrames%s.png' % d)
+    plt.savefig(fileName, dpi=plotDpi, transparent=True)
+    #plt.show()
+    plt.close()
+  
+def saveTracksColoredByDistance(tracks, filePrefix, cutoffValue, plotDpi, numDimensions):
+  
+  dims = [(0, 1)]
+  if numDimensions == 3:
+    dims.append((0, 2))
+    dims.append((1, 2))
     
-  plt.ylim(plt.ylim()[::-1])
-  
-  fileName = _determineOutputFileName(filePrefix, 'tracksByFrames.png')
-  plt.savefig(fileName, dpi=plotDpi, transparent=True)
-  #plt.show()
-  plt.close()
-  
-def saveTracksColoredByDistance(tracks, filePrefix, cutoffValue, plotDpi):
-  
-  for track in tracks:
-    xpositions = [position[0] for position in track.positions]
-    ypositions = [position[1] for position in track.positions]
+  for xDim, yDim in dims:
+    for track in tracks:
+      xpositions = [position[xDim] for position in track.positions]
+      ypositions = [position[yDim] for position in track.positions]
     
-    if track.maxDistanceTravelled() >= cutoffValue:
-      color = COLOR2
+      if track.maxDistanceTravelled() >= cutoffValue:
+        color = COLOR2
+      else:
+        color = COLOR3
+      plt.plot(xpositions, ypositions, color=color)
+    
+    plt.ylim(plt.ylim()[::-1])
+  
+    if numDimensions == 2:
+      d = ''
     else:
-      color = COLOR3
-    plt.plot(xpositions, ypositions, color=color)
-    
-  plt.ylim(plt.ylim()[::-1])
-  
-  fileName = _determineOutputFileName(filePrefix, 'tracksByDistance.png')
-  plt.savefig(fileName, dpi=plotDpi, transparent=True)
-  #plt.show()
-  plt.close()
+      d = '%d%d' % (xDim+1, yDim+1)
+    fileName = _determineOutputFileName(filePrefix, 'tracksByDistance%s.png' % d)
+    plt.savefig(fileName, dpi=plotDpi, transparent=True)
+    #plt.show()
+    plt.close()
   
 def _getResidenceTimes(tracks):
   

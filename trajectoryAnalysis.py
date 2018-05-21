@@ -121,10 +121,10 @@ def main():
         Track.saveTrackFramesInBin(tracks, filePrefix, args.binSize, value, args.plotDpi)
         
       if args.saveTracksColoredByFrames:
-        Track.saveTracksColoredByFrames(tracks, filePrefix, args.saveTracksColoredByFrames, args.plotDpi)
+        Track.saveTracksColoredByFrames(tracks, filePrefix, args.saveTracksColoredByFrames, args.plotDpi, args.numDimensions)
 
       if args.saveTracksColoredByDistance:
-        Track.saveTracksColoredByDistance(tracks, filePrefix, args.saveTracksColoredByDistance, args.plotDpi)
+        Track.saveTracksColoredByDistance(tracks, filePrefix, args.saveTracksColoredByDistance, args.plotDpi, args.numDimensions)
 
       if args.saveResidenceTimes:
         Track.saveResidenceTimes(tracks, filePrefix)
