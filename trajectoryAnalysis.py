@@ -42,6 +42,9 @@ def main():
   arg_parse.add_argument('-savePositionsFramesIntensities', default=False, action='store_true',
                          help='Save positions, frames and intensities of tracks to csv file')
   
+  arg_parse.add_argument('-saveIntensityHistogram', default=False, action='store_true',
+                         help='Save average intensity of tracks as histogram to csv file')
+  
   arg_parse.add_argument('-calcFramesPercentage', default=0, type=float,
                          help='Calculate track frames length which is >= than specified percentage over all tracks')
   
@@ -96,6 +99,9 @@ def main():
         
       if args.savePositionsFramesIntensities:
         Track.savePositionsFramesIntensities(tracks, filePrefix)
+
+      if args.saveIntensityHistogram:
+        Track.saveIntensityHistogram(tracks, filePrefix)
 
       if args.calcFramesPercentage > 0:
         Track.calcFramesPercentage(tracks, args.calcFramesPercentage)

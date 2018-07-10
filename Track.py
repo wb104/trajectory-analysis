@@ -182,17 +182,17 @@ def saveNumTracksInBin(tracks, filePrefix, binSize, minValue, maxValue, plotDpi)
   numTracks = _calcNumTracksByBin(tracks, binSize)
   
   # TEMP HACK
-  fileName = _determineOutputFileName(filePrefix, 'numTracks.csv')
-  with open(fileName, 'w') as fp:
-    fp.write('# xBin, yBin, count\n')
-    for yBin in range(201):
-      for xBin in range(101):
-        if numTracks[yBin][xBin] > 0:
-          fp.write('%d,%d,%d\n' % (xBin, yBin, numTracks[yBin][xBin]))
+  #fileName = _determineOutputFileName(filePrefix, 'numTracks.csv')
+  #with open(fileName, 'w') as fp:
+  #  fp.write('# xBin, yBin, count\n')
+  #  for yBin in range(201):
+  #    for xBin in range(101):
+  #      if numTracks[yBin][xBin] > 0:
+  #        fp.write('%d,%d,%d\n' % (xBin, yBin, numTracks[yBin][xBin]))
   
   cmap_name = COLOR1
-  plt.xlim((0, 100)) # TEMP HACK
-  plt.ylim((200, 0))  # y axis is backwards
+  #plt.xlim((0, 100)) # TEMP HACK
+  #plt.ylim((200, 0))  # y axis is backwards
   imgplot = plt.imshow(numTracks, cmap=cmap_name, vmin=minValue, vmax=maxValue, interpolation='nearest')
   #plt.xlim((0, len(numTracks[0]-1)))
   #plt.ylim((len(numTracks)-1, 0))  # y axis is backwards
@@ -210,6 +210,26 @@ def savePositionsFramesIntensities(tracks, filePrefix):
     for n, track in enumerate(tracks):
       fp.write('%d,%d,%d,%.1f\n' % (n+1, track.numberPositions, track.deltaFrames, track.averageIntensity))
 
+def saveIntensityHistogram(tracks, filePrefix):
+
+  intensities = [track.averageIntensity for track in tracks]
+  
+  maxIntensity = max(intensities)
+  nbins = len(intensities) // 20  # gives average of 20.0 hits per bin
+  binSize = maxIntensity / nbins
+  
+  hist = nbins * [0]
+  for intensity in intensities:
+    b = int(intensity / binSize)
+    b = min(nbins-1, b)
+    hist[b] += 1
+    
+  fileName = _determineOutputFileName(filePrefix, 'intensityHistogram.csv')
+  with open(fileName, 'w') as fp:
+    for b in range(nbins):
+      intensity = b * binSize
+      fp.write('%.0f,%d\n' % (intensity, hist[b]))
+  
 def _calcFramesByBin(tracks, binSize):
   
   xBinMax = yBinMax = 0
@@ -325,19 +345,30 @@ def saveTracksColoredByDistance(tracks, filePrefix, cutoffValue, plotDpi, numDim
     dims.append((0, 2))
     dims.append((1, 2))
     
+  #import random
+  #tracks = random.sample(tracks, 300) # HACK
+  
   for xDim, yDim in dims:
+    #if xDim == 0 and yDim == 2:
+    #  tracks = random.sample(tracks, 120) # HACK
+      
     for track in tracks:
       xpositions = [position[xDim] for position in track.positions]
       ypositions = [position[yDim] for position in track.positions]
     
       if track.maxDistanceTravelled() >= cutoffValue:
+        #color = 'orange' #COLOR3 #2 # HACK
         color = COLOR2
       else:
+        #color = COLOR2 #3 # HACK
         color = COLOR3
       plt.plot(xpositions, ypositions, color=color)
     
     plt.ylim(plt.ylim()[::-1])
-  
+    
+    #if yDim != 1:
+    #  plt.ylim((18000, -18000)) # HACK
+      
     if numDimensions == 2:
       d = ''
     else:
