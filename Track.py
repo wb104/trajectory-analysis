@@ -5,6 +5,7 @@ import os
 import numpy
   
 from scipy.optimize import curve_fit
+from scipy.stats import linregress
 
 from matplotlib import pyplot as plt
 from matplotlib import colors
@@ -55,11 +56,30 @@ class Track:
     distances = [_calcAdjustedDistance(self.positions[n], self.frames[n], self, 0) for n in range(1, len(self.positions))]
     
     return max(distances)
+    
+  def meanSquareDisplacements(self):
+    
+    msds = []
+    for n in range(1, self.numberPositions):
+      msd = 0
+      for i in range(self.numberPositions-n):
+        d = _calcDistance(self.positions[i+n], self.frames[i+n], self, i)
+        msd += d*d
+      msd /= self.numberPositions - n
+      msds.append(msd)
+      
+    return msds
 
+def _calcDistance(position, frame, track, trackPositionIndex=-1):
+  
+  delta = position - track.positions[trackPositionIndex]
+  distance = numpy.sqrt(numpy.sum(delta*delta))
+  
+  return distance
+  
 def _calcAdjustedDistance(position, frame, track, trackPositionIndex=-1):
   
   delta = position - track.positions[trackPositionIndex]
-  #distance = numpy.sqrt(numpy.sum(delta*delta))
   distance = numpy.sqrt(numpy.sum(delta*delta)) / numpy.sqrt(frame - track.frames[trackPositionIndex])
   
   return distance
@@ -215,7 +235,7 @@ def saveIntensityHistogram(tracks, filePrefix):
   intensities = [track.averageIntensity for track in tracks]
   
   maxIntensity = max(intensities)
-  nbins = len(intensities) // 20  # gives average of 20.0 hits per bin
+  nbins = len(intensities) // 10  # gives average of 10.0 hits per bin
   binSize = maxIntensity / nbins
   
   hist = nbins * [0]
@@ -278,6 +298,20 @@ def calcFramesByBinPercentage(tracks, binSize, percentage):
   
   return result
   
+def calcMedianIntensity(tracks, filePrefix):
+  
+  intensities = []
+  for track in tracks:
+    intensities.extend(track.intensities)
+    
+  print('%s: median intensity = %s' % (filePrefix, numpy.median(numpy.array(intensities))))
+  
+  return intensities
+    
+def endCalcMedianIntensity(directory, intensities):
+  
+  print('directory %s: median intensity = %s' % (directory, numpy.median(numpy.array(intensities))))
+
 def saveTrackFramesInBin(tracks, filePrefix, binSize, cutoffValue, plotDpi):
   
   trackFrames = _calcFramesByBin(tracks, binSize)
@@ -581,6 +615,120 @@ def fitSurvivalCounts(tracks, filePrefix, maxNumberExponentials=1, minNumPositio
     fp.write('%s\n' % ','.join(['%s' % w for w in ydata]))
     fp.write('%s\n' % ','.join(['%s' % w for w in yfit]))
             
+def calcMeanSquareDisplacements(tracks, filePrefix, plotDpi=600):
+  
+  xs = []
+  ys = []
+  
+  for track in tracks:
+    msds = track.meanSquareDisplacements()[:-3]  # chop off last three because those have poor stats
+    x = 0.5 * numpy.array(range(1, len(msds)+1)) # TBD: 0.5 secs per frame hardwired for now
+    y = msds
+    plt.loglog(x, y, alpha=0.5)
+    xs.append(x)
+    ys.append(y)
+    
+  ##fileName = _determineOutputFileName(filePrefix, 'meanSquareDisplacements.png')
+  ##plt.savefig(fileName, dpi=plotDpi, transparent=True)
+  #plt.show()
+  ##plt.close()
+  
+  return (xs, ys)
+
+""""
+def _fitDoubleFunc(xlog, *params):
+  
+  slope1, intercept1, slope2, intercept2 = params
+  alpha1 = slope1
+  k1 = numpy.power(10, intercept1)
+  alpha2 = slope2
+  k2 = numpy.power(10, intercept2)
+  x = numpy.power(10, xlog)
+  ylog = numpy.log10(k1*numpy.power(x, alpha1) + k2*numpy.power(x, alpha2))
+  
+  return ylog
+"""
+  
+def endMeanSquareDisplacements(directory, xs, ys, xlim=(1.0e-1, 1.0e3), ylim=(1.0e2, 1.0e6), plotDpi=600):
+  
+  #plt.xlim(xlim)
+  plt.ylim(ylim)
+
+  xs = [numpy.array(x) for x in xs]
+  ys = [numpy.array(y) for y in ys]
+  xall = numpy.concatenate(xs)
+  yall = numpy.concatenate(ys)
+  
+  xyall = numpy.array(sorted(zip(xall, yall)))
+  xall = xyall[:,0]
+  yall = xyall[:,1]
+  
+  n = 0
+  while n < len(xall) and xall[n] <= 25: # HACK
+    n += 1
+    
+  xall = xall[:n]
+  yall = yall[:n]
+  
+  xlog = numpy.log10(xall)
+  ylog = numpy.log10(yall)
+  
+  """
+  n = len(xlog)
+  slope1, intercept1, r_value1, p_value1, std_err1 = linregress(xlog[:n//2], ylog[:n//2])
+  slope2, intercept2, r_value2, p_value2, std_err2 = linregress(xlog[n//2:int(0.9*n)], ylog[n//2:int(0.9*n)])
+  
+  params0 = (slope1, intercept1, slope2, intercept2)
+  params, params_cov = curve_fit(_fitDoubleFunc, xlog, ylog, p0=params0)
+"""
+  
+  slope, intercept, r_value, p_value, std_err = linregress(xlog, ylog)
+  print('slope, intercept, r_value, p_value, std_err =', slope, intercept, r_value, p_value, std_err)
+  Dapp = 0.25*numpy.power(10, intercept)
+  print('alpha, Dapp =', slope, Dapp)
+  x0 = numpy.min(xall)
+  y0 = numpy.power(10, intercept + slope*numpy.log10(x0))
+  x1 = numpy.max(xall)
+  y1 = numpy.power(10, intercept + slope*numpy.log10(x1))
+  plt.xlim((x0, x1))
+  plt.plot((x0, x1), (y0, y1), color='black', linewidth=2)
+   
+  """
+  xfits = []
+  x = xall[0]
+  while x < xall[-1]:
+    xfits.append(x)
+    x *= 1.1
+  xfits.append(xall[-1])
+  xfits = numpy.array(xfits)
+  xlogs = numpy.log10(xfits)
+  params = tuple(params)
+  yfits = numpy.power(10, _fitLogFunc(xlogs, *params))
+  plt.plot(xfits, yfits, color='black', linewidth=2)
+"""
+    
+  directoryOut = directory + '_out'
+  if not os.path.exists(directoryOut):
+    os.mkdir(directoryOut)
+    
+  prefix = os.path.basename(directory)
+  fileName = os.path.join(directoryOut, '%s_meanSquareDisplacements.png' % prefix)
+
+  plt.savefig(fileName, dpi=plotDpi, transparent=True)
+  plt.close()
+  
+  statsFile = os.path.join(directoryOut, '%s_fitParams.csv' % prefix)
+  with open(statsFile, 'w') as fp:
+    fp.write('#n,alpha,Dapp\n')
+    fp.write('all,%s,%s\n' % (slope, Dapp))
+    for n, x in enumerate(xs):
+      y = ys[n]
+      xlog = numpy.log10(x)
+      ylog = numpy.log10(y)
+      slope, intercept, r_value, p_value, std_err = linregress(xlog, ylog)
+      Dapp = 0.25*numpy.power(10, intercept)
+      fp.write('%s,%s,%s\n' % (n+1, slope, Dapp))
+    
 if __name__ == '__main__':
 
   import os

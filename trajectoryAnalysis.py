@@ -51,6 +51,9 @@ def main():
   arg_parse.add_argument('-calcMaxNumTracksInBin', default=False, action='store_true',
                          help='Calculate maximum number of tracks in any bin')
   
+  arg_parse.add_argument('-calcMedianIntensity', default=False, action='store_true',
+                         help='Calculate median intensity across all positions')
+  
   arg_parse.add_argument('-saveNumTracksInBin', default=0, type=int,
                          help='Save number of tracks in each bin (as a plot, saved as png) with maximum number for color being specified by given value, -1 means use maximum number of tracks in any bin')
   
@@ -81,6 +84,9 @@ def main():
   arg_parse.add_argument('-fitUsingLogData', default=False, action='store_true',
                          help='Fit survival count using log of data (so later points count as much as early points)')
   
+  arg_parse.add_argument('-calcMeanSquareDisplacements', default=False, action='store_true',
+                         help='Calculate mean square displacements for one frame, two frames, three frames, etc.')
+                         
   args = arg_parse.parse_args()
 
   assert args.numDimensions in (2, 3), 'numDimensions = %d, must be in (2, 3)' % args.numDimensions
@@ -89,6 +95,9 @@ def main():
   
   for directory in args.directories:
     print('Processing directory %s' % directory)
+    xs = []
+    ys = []
+    intensities = []
     relfileNames = os.listdir(directory)
     relfileNames = [relfileName for relfileName in relfileNames if relfileName.endswith(suffix)]
     for relfileName in relfileNames:
@@ -119,6 +128,9 @@ def main():
       if args.calcFramesByBinPercentage > 0:
         Track.calcFramesByBinPercentage(tracks, args.binSize, args.calcFramesByBinPercentage)
         
+      if args.calcMedianIntensity:
+        intensities.extend(Track.calcMedianIntensity(tracks, filePrefix))
+        
       if args.saveTrackFramesInBin:
         if args.saveTrackFramesInBin == -1:
           value = Track.calcFramesByBinPercentage(tracks, args.binSize, 100.0)
@@ -140,6 +152,17 @@ def main():
         
       if args.fitSurvivalCounts > 0:
         Track.fitSurvivalCounts(tracks, filePrefix, args.fitSurvivalCounts, args.minNumPositions, args.fitUsingLogData, args.plotDpi)
+        
+      if args.calcMeanSquareDisplacements:
+        track_xs, track_ys = Track.calcMeanSquareDisplacements(tracks, filePrefix, args.plotDpi)
+        xs.extend(track_xs)
+        ys.extend(track_ys)
+        
+    if args.calcMeanSquareDisplacements:
+      Track.endMeanSquareDisplacements(directory, xs, ys, plotDpi=args.plotDpi)
+        
+    if args.calcMedianIntensity:
+      Track.endCalcMedianIntensity(directory, intensities)
         
 if __name__ == '__main__':
   
