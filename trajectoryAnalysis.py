@@ -39,8 +39,11 @@ def main():
   arg_parse.add_argument('-plotDpi', default=600, type=int,
                          help='DPI value for binned plots')
   
+  arg_parse.add_argument('-saveTracks', default=False, action='store_true',
+                         help='Save frames and positions of tracks to csv file')
+  
   arg_parse.add_argument('-savePositionsFramesIntensities', default=False, action='store_true',
-                         help='Save positions, frames and intensities of tracks to csv file')
+                         help='Save number of positions, frames and intensities of tracks to csv file')
   
   arg_parse.add_argument('-saveIntensityHistogram', default=False, action='store_true',
                          help='Save average intensity of tracks as histogram to csv file')
@@ -97,6 +100,7 @@ def main():
     print('Processing directory %s' % directory)
     xs = []
     ys = []
+    all_tracks = []
     intensities = []
     relfileNames = os.listdir(directory)
     relfileNames = [relfileName for relfileName in relfileNames if relfileName.endswith(suffix)]
@@ -105,6 +109,9 @@ def main():
       fileName = os.path.join(directory, relfileName)
       print('Determining tracks for %s' % fileName)
       tracks = Track.determineTracks(fileName, args.numDimensions, args.maxJumpDistance, args.maxFrameGap, args.minNumPositions)
+        
+      if args.saveTracks:
+        Track.saveTracks(tracks, filePrefix)
         
       if args.savePositionsFramesIntensities:
         Track.savePositionsFramesIntensities(tracks, filePrefix)
@@ -157,9 +164,10 @@ def main():
         track_xs, track_ys = Track.calcMeanSquareDisplacements(tracks, filePrefix, args.plotDpi)
         xs.extend(track_xs)
         ys.extend(track_ys)
+        all_tracks.extend(tracks)
         
     if args.calcMeanSquareDisplacements:
-      Track.endMeanSquareDisplacements(directory, xs, ys, plotDpi=args.plotDpi)
+      Track.endMeanSquareDisplacements(directory, xs, ys, all_tracks, plotDpi=args.plotDpi)
         
     if args.calcMedianIntensity:
       Track.endCalcMedianIntensity(directory, intensities)

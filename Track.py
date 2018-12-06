@@ -6,6 +6,7 @@ import numpy
   
 from scipy.optimize import curve_fit
 from scipy.stats import linregress
+from scipy.stats import gmean
 
 from matplotlib import pyplot as plt
 from matplotlib import colors
@@ -42,6 +43,14 @@ class Track:
       return numpy.average(numpy.array(self.intensities))
     
   @property
+  def geometricMeanIntensity(self):
+    
+    if self.numberPositions >= 3:
+      return gmean(numpy.array(self.intensities[1:-1]))
+    else:
+      return gmean(numpy.array(self.intensities))
+    
+  @property
   def numberPositions(self):
     
     return len(self.positions)
@@ -69,6 +78,10 @@ class Track:
       msds.append(msd)
       
     return msds
+    
+  def adjustedDistance(self, firstIndex=0, lastIndex=-1):
+    
+    return _calcAdjustedDistance(self.positions[firstIndex], self.frames[firstIndex], self, lastIndex)
 
 def _calcDistance(position, frame, track, trackPositionIndex=-1):
   
@@ -80,7 +93,7 @@ def _calcDistance(position, frame, track, trackPositionIndex=-1):
 def _calcAdjustedDistance(position, frame, track, trackPositionIndex=-1):
   
   delta = position - track.positions[trackPositionIndex]
-  distance = numpy.sqrt(numpy.sum(delta*delta)) / numpy.sqrt(frame - track.frames[trackPositionIndex])
+  distance = numpy.sqrt(numpy.sum(delta*delta)) / numpy.sqrt(abs(frame - track.frames[trackPositionIndex]))
   
   return distance
   
@@ -221,6 +234,23 @@ def saveNumTracksInBin(tracks, filePrefix, binSize, minValue, maxValue, plotDpi)
   plt.savefig(fileName, dpi=plotDpi, transparent=True)
   #plt.show()
   plt.close()
+  
+def saveTracks(tracks, filePrefix):
+
+  fileName = _determineOutputFileName(filePrefix, 'trackPositions.csv')
+  with open(fileName, 'w') as fp:
+    fp.write('#track,frame,x,y,z\n')
+    for n, track in enumerate(tracks):
+      for i, position in enumerate(track.positions):
+        frame = track.frames[i]
+        if len(position) == 2:
+          position0, position1 = position
+          position2 = 0
+        else:
+          position0, position1, position2 = position
+        fields = [n+1, frame, position0, position1, position2]
+        fields = ['%s' % field for field in fields]
+        fp.write(','.join(fields) + '\n')
   
 def savePositionsFramesIntensities(tracks, filePrefix):
 
@@ -649,7 +679,7 @@ def _fitDoubleFunc(xlog, *params):
   return ylog
 """
   
-def endMeanSquareDisplacements(directory, xs, ys, xlim=(1.0e-1, 1.0e3), ylim=(1.0e2, 1.0e6), plotDpi=600):
+def endMeanSquareDisplacements(directory, xs, ys, tracks, xlim=(1.0e-1, 1.0e3), ylim=(1.0e2, 1.0e6), plotDpi=600):
   
   #plt.xlim(xlim)
   plt.ylim(ylim)
@@ -719,16 +749,22 @@ def endMeanSquareDisplacements(directory, xs, ys, xlim=(1.0e-1, 1.0e3), ylim=(1.
   
   statsFile = os.path.join(directoryOut, '%s_fitParams.csv' % prefix)
   with open(statsFile, 'w') as fp:
-    fp.write('#n,alpha,Dapp\n')
+    fp.write('#n,alpha,Dapp,avgInt,geomInt,time\n')
     fp.write('all,%s,%s\n' % (slope, Dapp))
     for n, x in enumerate(xs):
       y = ys[n]
+      track = tracks[n]
       xlog = numpy.log10(x)
       ylog = numpy.log10(y)
       slope, intercept, r_value, p_value, std_err = linregress(xlog, ylog)
       Dapp = 0.25*numpy.power(10, intercept)
-      fp.write('%s,%s,%s\n' % (n+1, slope, Dapp))
-    
+      fields = [n+1, slope, Dapp, track.averageIntensity, track.geometricMeanIntensity, 0.5*track.deltaFrames] # TBD: 0.5 hardwired for now
+      fields = ['%s' % field for field in fields]
+      fp.write(','.join(fields) + '\n')
+  
+  filePrefix = '%s/%s' % (directory, directory)
+  saveTracks(tracks, filePrefix)
+  
 if __name__ == '__main__':
 
   import os
