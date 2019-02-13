@@ -35,6 +35,11 @@ class Track:
     self.distances.append(distance)
     
   @property
+  def averagePosition(self):
+    
+    return numpy.average(numpy.array(self.positions), axis=0)
+    
+  @property
   def averageIntensity(self):
     
     if self.numberPositions >= 3:
@@ -256,9 +261,10 @@ def savePositionsFramesIntensities(tracks, filePrefix):
 
   fileName = _determineOutputFileName(filePrefix, 'positionsFramesIntensity.csv')
   with open(fileName, 'w') as fp:
-    fp.write('# track, numberPositions, deltaFrames, averageIntensity (missing out first and last ones if >= 3 positions)\n')
+    fp.write('# track, numberPositions, deltaFrames, averageIntensity (missing out first and last ones if >= 3 positions), averagePosition\n')
     for n, track in enumerate(tracks):
-      fp.write('%d,%d,%d,%.1f\n' % (n+1, track.numberPositions, track.deltaFrames, track.averageIntensity))
+      averagePosition = ','.join(['%.1f' % pos for pos in track.averagePosition])
+      fp.write('%d,%d,%d,%.1f,%s\n' % (n+1, track.numberPositions, track.deltaFrames, track.averageIntensity, averagePosition))
 
 def saveIntensityHistogram(tracks, filePrefix):
 
