@@ -133,7 +133,11 @@ def determineTracks(fileName, numDimensions, maxJumpDistance, maxFrameGap, minNu
     fp.readline()  # header
 
     for line in fp:
-      if numDimensions == 2:
+      if numDimensions == 1:
+        (frame, x) = line.rstrip().split()[:2]
+        position = numpy.array((float(x),))
+        intensity = base = 0
+      elif numDimensions == 2:
         (x, y, frame, intensity) = line.rstrip().split()[:4]
         position = numpy.array((float(x), float(y)))
         base = 0
@@ -248,12 +252,19 @@ def saveTracks(tracks, filePrefix):
     for n, track in enumerate(tracks):
       for i, position in enumerate(track.positions):
         frame = track.frames[i]
-        if len(position) == 2:
+        """
+        if len(position) == 1:
+          position0 = position[0]
+          position1 = position2 = 0
+        elif len(position) == 2:
           position0, position1 = position
           position2 = 0
         else:
           position0, position1, position2 = position
         fields = [n+1, frame, position0, position1, position2]
+"""
+        fields = [n+1, frame]
+        fields.extend(position)
         fields = ['%s' % field for field in fields]
         fp.write(','.join(fields) + '\n')
   

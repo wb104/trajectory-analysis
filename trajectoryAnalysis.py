@@ -8,6 +8,7 @@ DESCRIPTION = 'Analysis of trajectories for cell image data'
     
 def main():
   
+  SUFFIX1D = '.txt'
   SUFFIX2D = '.txt'
   SUFFIX3D = '.csv'
   
@@ -22,7 +23,7 @@ def main():
                          help='Directories containing *%s (or *%s) files to be analysed' % (SUFFIX2D, SUFFIX3D))
 
   arg_parse.add_argument('-numDimensions', default=2, type=int,
-                         help='Number of dimensions for the tracks (2 or 3)')
+                         help='Number of dimensions for the tracks (1, 2 or 3)')
 
   arg_parse.add_argument('-maxJumpDistance', default=100, type=float,
                          help='Maximum distance can jump between frames (adjusted distance, taking frame difference into account)')
@@ -92,9 +93,9 @@ def main():
                          
   args = arg_parse.parse_args()
 
-  assert args.numDimensions in (2, 3), 'numDimensions = %d, must be in (2, 3)' % args.numDimensions
+  assert args.numDimensions in (1, 2, 3), 'numDimensions = %d, must be in (1, 2, 3)' % args.numDimensions
 
-  suffix = SUFFIX2D if args.numDimensions == 2 else SUFFIX3D
+  suffix = SUFFIX2D if args.numDimensions == 2 else (SUFFIX3D if args.numDimensions == 3 else SUFFIX1D)
   
   for directory in args.directories:
     print('Processing directory %s' % directory)
