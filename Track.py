@@ -696,7 +696,7 @@ def _fitDoubleFunc(xlog, *params):
   return ylog
 """
   
-def endMeanSquareDisplacements(directory, xs, ys, tracks, xlim=(1.0e-1, 1.0e3), ylim=(1.0e2, 1.0e6), plotDpi=600):
+def endMeanSquareDisplacements(directory, xs, ys, tracks, xlim=(1.0e-1, 1.0e3), ylim=(1.0e0, 1.0e6), plotDpi=600):
   
   #plt.xlim(xlim)
   plt.ylim(ylim)
