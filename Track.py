@@ -125,9 +125,8 @@ def _processPosition(finishedTracks, currentTracks, position, frame, intensity, 
 
 def determineTracks(fileName, numDimensions, maxJumpDistance, maxFrameGap, minNumPositions):
 
-  finishedTracks = set()
-  currentTracks = set()
-
+  frameData = []
+  
   with open(fileName, 'rU') as fp:
     
     fp.readline()  # header
@@ -148,8 +147,15 @@ def determineTracks(fileName, numDimensions, maxJumpDistance, maxFrameGap, minNu
 
       frame = int(frame)
       intensity = float(intensity) - float(base)
+      
+      frameData.append((frame, intensity, position))
     
-      _processPosition(finishedTracks, currentTracks, position, frame, intensity, maxJumpDistance, maxFrameGap)
+  finishedTracks = set()
+  currentTracks = set()
+
+  frameData.sort() # 1D data not in frame order, 2D and 3D is, just sort thme all to make sure
+  for (frame, intensity, position) in frameData:
+    _processPosition(finishedTracks, currentTracks, position, frame, intensity, maxJumpDistance, maxFrameGap)
       
   finishedTracks.update(currentTracks)
 
