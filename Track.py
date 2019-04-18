@@ -104,6 +104,8 @@ def _calcAdjustedDistance(position, frame, track, trackPositionIndex=-1):
   
 def _processPosition(finishedTracks, currentTracks, position, frame, intensity, maxJumpDistance, maxFrameGap):
   
+  position = numpy.array(position)
+  
   bestDist = None
   bestTrack = None
   
@@ -134,16 +136,16 @@ def determineTracks(fileName, numDimensions, maxJumpDistance, maxFrameGap, minNu
     for line in fp:
       if numDimensions == 1:
         (frame, x) = line.rstrip().split()[:2]
-        position = numpy.array((float(x),))
+        position = (float(x),)
         intensity = base = 0
       elif numDimensions == 2:
         (x, y, frame, intensity) = line.rstrip().split()[:4]
-        position = numpy.array((float(x), float(y)))
+        position = (float(x), float(y))
         base = 0
       elif numDimensions == 3:
         #(x, y, z, frame, intensity) = line.rstrip().split()[:5]
         (frame, junk, x, y, z, junk, junk, junk, intensity, base) = line.rstrip().split(',')[:10]
-        position = numpy.array((float(x), float(y), float(z)))
+        position = (float(x), float(y), float(z))
 
       frame = int(frame)
       intensity = float(intensity) - float(base)
@@ -153,7 +155,7 @@ def determineTracks(fileName, numDimensions, maxJumpDistance, maxFrameGap, minNu
   finishedTracks = set()
   currentTracks = set()
 
-  frameData.sort() # 1D data not in frame order, 2D and 3D is, just sort thme all to make sure
+  frameData.sort() # 1D data not in frame order, 2D and 3D is, just sort them all to make sure
   for (frame, intensity, position) in frameData:
     _processPosition(finishedTracks, currentTracks, position, frame, intensity, maxJumpDistance, maxFrameGap)
       
