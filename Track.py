@@ -133,7 +133,10 @@ def determineTracks(fileName, numDimensions, maxJumpDistance, maxFrameGap, minNu
     
     fp.readline()  # header
 
-    for line in fp:
+    n = 0
+    for n, line in enumerate(fp):
+      if n > 0 and n % 100000 == 0:
+        print('reading line %d' % n)
       if numDimensions == 1:
         (frame, x) = line.rstrip().split()[:2]
         position = (float(x),)
@@ -151,12 +154,15 @@ def determineTracks(fileName, numDimensions, maxJumpDistance, maxFrameGap, minNu
       intensity = float(intensity) - float(base)
       
       frameData.append((frame, intensity, position))
+    print('found %d lines' % n)
     
   finishedTracks = set()
   currentTracks = set()
 
   frameData.sort() # 1D data not in frame order, 2D and 3D is, just sort them all to make sure
-  for (frame, intensity, position) in frameData:
+  for n, (frame, intensity, position) in enumerate(frameData):
+    if n > 0 and n % 1000 == 0:
+      print('processing frame data %d (finishedTracks %d, currentTracks %d)' % (n, len(finishedTracks), len(currentTracks)))
     _processPosition(finishedTracks, currentTracks, position, frame, intensity, maxJumpDistance, maxFrameGap)
       
   finishedTracks.update(currentTracks)
@@ -255,6 +261,7 @@ def saveNumTracksInBin(tracks, filePrefix, binSize, minValue, maxValue, plotDpi)
 def saveTracks(tracks, filePrefix):
 
   fileName = _determineOutputFileName(filePrefix, 'trackPositions.csv')
+  print('Saving tracks to %s' % fileName)
   with open(fileName, 'w') as fp:
     fp.write('#track,frame,x,y,z\n')
     for n, track in enumerate(tracks):
@@ -284,6 +291,15 @@ def savePositionsFramesIntensities(tracks, filePrefix):
     for n, track in enumerate(tracks):
       averagePosition = ','.join(['%.1f' % pos for pos in track.averagePosition])
       fp.write('%d,%d,%d,%.1f,%s\n' % (n+1, track.numberPositions, track.deltaFrames, track.averageIntensity, averagePosition))
+
+def savePositionFramesIntensity(tracks, filePrefix):
+
+  fileName = _determineOutputFileName(filePrefix, 'positionFramesIntensity.csv')
+  with open(fileName, 'w') as fp:
+    fp.write('# averagePosition, deltaFrames, averageIntensity (missing out first and last ones if >= 3 positions)\n')
+    for n, track in enumerate(tracks):
+      averagePosition = ','.join(['%.1f' % pos for pos in track.averagePosition])
+      fp.write('%s,%d,%.1f\n' % (averagePosition, track.deltaFrames, track.averageIntensity))
 
 def saveIntensityHistogram(tracks, filePrefix):
 

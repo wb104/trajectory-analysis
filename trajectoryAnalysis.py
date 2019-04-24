@@ -44,7 +44,10 @@ def main():
                          help='Save frames and positions of tracks to csv file')
   
   arg_parse.add_argument('-savePositionsFramesIntensities', default=False, action='store_true',
-                         help='Save number of positions, frames and intensities of tracks to csv file')
+                         help='Save number of positions, number of frames, average intensity and average position of tracks to csv file')
+  
+  arg_parse.add_argument('-savePositionFramesIntensity', default=False, action='store_true',
+                         help='Save average position, number of frames, and average intensity of tracks to csv file')
   
   arg_parse.add_argument('-saveIntensityHistogram', default=False, action='store_true',
                          help='Save average intensity of tracks as histogram to csv file')
@@ -116,6 +119,9 @@ def main():
         
       if args.savePositionsFramesIntensities:
         Track.savePositionsFramesIntensities(tracks, filePrefix)
+
+      if args.savePositionFramesIntensity:
+        Track.savePositionFramesIntensity(tracks, filePrefix)
 
       if args.saveIntensityHistogram:
         Track.saveIntensityHistogram(tracks, filePrefix)
