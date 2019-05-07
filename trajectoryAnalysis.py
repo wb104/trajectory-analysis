@@ -40,6 +40,9 @@ def main():
   arg_parse.add_argument('-plotDpi', default=600, type=int,
                          help='DPI value for binned plots')
   
+  arg_parse.add_argument('-isNewPositionFile', default=False, action='store_true',
+                         help='Whether new format position file')
+  
   arg_parse.add_argument('-saveTracks', default=False, action='store_true',
                          help='Save frames and positions of tracks to csv file')
   
@@ -112,7 +115,7 @@ def main():
       filePrefix = os.path.join(directory, relfileName[:-len(suffix)])
       fileName = os.path.join(directory, relfileName)
       print('Determining tracks for %s' % fileName)
-      tracks = Track.determineTracks(fileName, args.numDimensions, args.maxJumpDistance, args.maxFrameGap, args.minNumPositions)
+      tracks = Track.determineTracks(fileName, args.numDimensions, args.maxJumpDistance, args.maxFrameGap, args.minNumPositions, args.isNewPositionFile)
         
       if args.saveTracks:
         Track.saveTracks(tracks, filePrefix)

@@ -125,9 +125,7 @@ def _processPosition(finishedTracks, currentTracks, position, frame, intensity, 
     track = Track(position, frame, intensity)
     currentTracks.add(track)
 
-def determineTracks(fileName, numDimensions, maxJumpDistance, maxFrameGap, minNumPositions):
-
-  frameData = []
+def readOldPositionFile(fileName, numDimensions):
   
   with open(fileName, 'rU') as fp:
     
@@ -153,13 +151,55 @@ def determineTracks(fileName, numDimensions, maxJumpDistance, maxFrameGap, minNu
       frame = int(frame)
       intensity = float(intensity) - float(base)
       
-      frameData.append((frame, intensity, position))
-    print('found %d lines' % n)
+      yield (frame, intensity, position)
+    #print('found %d lines' % n)
+
+def readNewPositionFile(fileName, numDimensions):
+  
+  with open(fileName, 'rU') as fp:
+    
+    n = 0
+    for n, line in enumerate(fp):
+      if n > 0 and n % 100000 == 0:
+        print('reading line %d' % n)
+        
+      if line.startswith('#'): # comment line
+        continue
+        
+      fields = line.rstrip().split()
+      
+      frame = int(fields[0])
+      intensity = float(fields[8]) - float(fields[7])
+      x, y, z = fields[9:12]
+      
+      if numDimensions == 1:
+        position = (float(x),)
+      elif numDimensions == 2:
+        position = (float(x), float(y))
+      elif numDimensions == 3:
+        position = (float(x), float(y), float(z))
+      
+      yield (frame, intensity, position)
+    #print('found %d lines' % n)
+
+def determineTracks(fileName, numDimensions, maxJumpDistance, maxFrameGap, minNumPositions, isNewPositionFile=True):
+
+  frameData = []
+  
+  if isNewPositionFile:
+    readPositionFile = readNewPositionFile
+  else:
+    readPositionFile = readOldPositionFile
+    
+  for (frame, intensity, position) in readPositionFile(fileName, numDimensions):
+    frameData.append((frame, intensity, position))
+    
+  print('found %d records' % len(frameData))
     
   finishedTracks = set()
   currentTracks = set()
 
-  frameData.sort() # 1D data not in frame order, 2D and 3D is, just sort them all to make sure
+  frameData.sort() # old data might not be in frame order
   for n, (frame, intensity, position) in enumerate(frameData):
     if n > 0 and n % 1000 == 0:
       print('processing frame data %d (finishedTracks %d, currentTracks %d)' % (n, len(finishedTracks), len(currentTracks)))
