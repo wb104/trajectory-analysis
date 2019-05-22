@@ -163,7 +163,7 @@ def readNewPositionFile(fileName, numDimensions):
       if n > 0 and n % 100000 == 0:
         print('reading line %d' % n)
         
-      if line.startswith('#'): # comment line
+      if line.startswith('#') or line.startswith('"#'): # comment line
         continue
         
       fields = line.rstrip().split()
