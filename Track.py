@@ -307,7 +307,7 @@ def saveTracks(tracks, filePrefix):
     for n, track in enumerate(tracks):
       for i, position in enumerate(track.positions):
         frame = track.frames[i]
-        """
+
         if len(position) == 1:
           position0 = position[0]
           position1 = position2 = 0
@@ -317,9 +317,10 @@ def saveTracks(tracks, filePrefix):
         else:
           position0, position1, position2 = position
         fields = [n+1, frame, position0, position1, position2]
-"""
-        fields = [n+1, frame]
-        fields.extend(position)
+
+        #fields = [n+1, frame]
+        #fields.extend(position)
+        
         fields = ['%s' % field for field in fields]
         fp.write(','.join(fields) + '\n')
   
@@ -331,7 +332,7 @@ def savePositionsFramesIntensities(tracks, filePrefix):
     for n, track in enumerate(tracks):
       averagePosition = ','.join(['%.1f' % pos for pos in track.averagePosition])
       fp.write('%d,%d,%d,%.1f,%s\n' % (n+1, track.numberPositions, track.deltaFrames, track.averageIntensity, averagePosition))
-
+      
 def savePositionFramesIntensity(tracks, filePrefix):
 
   fileName = _determineOutputFileName(filePrefix, 'positionFramesIntensity.csv')
