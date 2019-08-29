@@ -17,14 +17,21 @@ COLOR3 = '#ffd966'  # = (255, 217, 102), some version of yellow
 
 class Track:
   
-  def __init__(self, position, frame, intensity):
+  def __init__(self, position, frame, intensity, signal=None, background=0.0, noise=0.0, precision=0.0):
 
     self.positions = [position]
     self.frames = [frame]
     self.intensities = [intensity]
     self.distances = [] # change in position / sqrt(change in frame)
     
-  def addPosition(self, position, frame, intensity):
+    if signal is None:
+      signal = intensity + background
+    self.signals = [signal]
+    self.backgrounds = [background]
+    self.noises = [noise]
+    self.precisions = [precision]
+    
+  def addPosition(self, position, frame, intensity, signal=None, background=0.0, noise=0.0, precision=0.0):
 
     distance = _calcAdjustedDistance(position, frame, self) # have to calculate this first
     
@@ -34,6 +41,13 @@ class Track:
     
     self.distances.append(distance)
     
+    if signal is None:
+      signal = intensity + background
+    self.signals.append(signal)
+    self.backgrounds.append(background)
+    self.noises.append(noise)
+    self.precisions.append(precision)
+
   @property
   def averagePosition(self):
     
@@ -55,6 +69,54 @@ class Track:
     else:
       return gmean(numpy.array(self.intensities))
     
+  @property
+  def averageSignal(self):
+    
+    if self.numberPositions >= 3:
+      return numpy.average(numpy.array(self.signals[1:-1]))
+    else:
+      return numpy.average(numpy.array(self.signals))
+    
+  @property
+  def averageBackground(self):
+    
+    if self.numberPositions >= 3:
+      return numpy.average(numpy.array(self.backgrounds[1:-1]))
+    else:
+      return numpy.average(numpy.array(self.backgrounds))
+    
+  @property
+  def averageNoise(self):
+    
+    if self.numberPositions >= 3:
+      return numpy.average(numpy.array(self.noises[1:-1]))
+    else:
+      return numpy.average(numpy.array(self.noises))
+    
+  @property
+  def averagePrecision(self):
+    
+    if self.numberPositions >= 3:
+      return numpy.average(numpy.array(self.precisions[1:-1]))
+    else:
+      return numpy.average(numpy.array(self.precisions))
+    
+  @property
+  def averageSignalToNoise(self):
+    
+    if self.numberPositions >= 3:
+      noises = numpy.array(self.noises[1:-1])
+      signals = numpy.array(self.signals[1:-1])
+    else:
+      noises = numpy.array(self.noises)
+      signals = numpy.array(self.signals)
+
+    if len(signals) > 0:
+      ratio = signals / noises
+      return numpy.average(ratio)
+    else:
+      return 0.0
+      
   @property
   def numberPositions(self):
     
@@ -102,7 +164,7 @@ def _calcAdjustedDistance(position, frame, track, trackPositionIndex=-1):
   
   return distance
   
-def _processPosition(finishedTracks, currentTracks, position, frame, intensity, maxJumpDistance, maxFrameGap):
+def _processPosition(finishedTracks, currentTracks, position, frame, intensity, signal, background, noise, precision, maxJumpDistance, maxFrameGap):
   
   position = numpy.array(position)
   
@@ -120,9 +182,9 @@ def _processPosition(finishedTracks, currentTracks, position, frame, intensity, 
         bestTrack = track
 
   if bestTrack:
-    bestTrack.addPosition(position, frame, intensity)
+    bestTrack.addPosition(position, frame, intensity, signal, background, noise, precision)
   else:
-    track = Track(position, frame, intensity)
+    track = Track(position, frame, intensity, signal, background, noise, precision)
     currentTracks.add(track)
 
 def readOldPositionFile(fileName, numDimensions):
@@ -145,13 +207,17 @@ def readOldPositionFile(fileName, numDimensions):
         base = 0
       elif numDimensions == 3:
         #(x, y, z, frame, intensity) = line.rstrip().split()[:5]
-        (frame, junk, x, y, z, junk, junk, junk, intensity, base) = line.rstrip().split(',')[:10]
+        (frame, junk, x, y, z, junk, junk, junk, signal, background) = line.rstrip().split(',')[:10]
         position = (float(x), float(y), float(z))
 
       frame = int(frame)
-      intensity = float(intensity) - float(base)
+      signal = float(signal)
+      background = float(background)
+      intensity = signal - background
       
-      yield (frame, intensity, position)
+      noise = precision = 0.0
+      
+      yield (frame, intensity, position, signal, background, noise, precision)
     #print('found %d lines' % n)
 
 def readNewPositionFile(fileName, numDimensions):
@@ -179,7 +245,12 @@ def readNewPositionFile(fileName, numDimensions):
       elif numDimensions == 3:
         position = (float(x), float(y), float(z))
       
-      yield (frame, intensity, position)
+      noise = float(fields[5])
+      background = float(fields[7])
+      signal = float(fields[8])
+      precision = float(fields[13]) if len(fields) >= 14 else 0.0
+
+      yield (frame, intensity, position, signal, background, noise, precision)
     #print('found %d lines' % n)
 
 def determineTracks(fileName, numDimensions, maxJumpDistance, maxFrameGap, minNumPositions, isNewPositionFile=True):
@@ -191,8 +262,8 @@ def determineTracks(fileName, numDimensions, maxJumpDistance, maxFrameGap, minNu
   else:
     readPositionFile = readOldPositionFile
     
-  for (frame, intensity, position) in readPositionFile(fileName, numDimensions):
-    frameData.append((frame, intensity, position))
+  for (frame, intensity, position, signal, background, noise, precision) in readPositionFile(fileName, numDimensions):
+    frameData.append((frame, intensity, position, signal, background, noise, precision))
     
   print('found %d records' % len(frameData))
     
@@ -200,10 +271,10 @@ def determineTracks(fileName, numDimensions, maxJumpDistance, maxFrameGap, minNu
   currentTracks = set()
 
   frameData.sort() # old data might not be in frame order
-  for n, (frame, intensity, position) in enumerate(frameData):
+  for n, (frame, intensity, position, signal, background, noise, precision) in enumerate(frameData):
     if n > 0 and n % 1000 == 0:
       print('processing frame data %d (finishedTracks %d, currentTracks %d)' % (n, len(finishedTracks), len(currentTracks)))
-    _processPosition(finishedTracks, currentTracks, position, frame, intensity, maxJumpDistance, maxFrameGap)
+    _processPosition(finishedTracks, currentTracks, position, frame, intensity, signal, background, noise, precision, maxJumpDistance, maxFrameGap)
       
   finishedTracks.update(currentTracks)
 
@@ -328,19 +399,21 @@ def savePositionsFramesIntensities(tracks, filePrefix):
 
   fileName = _determineOutputFileName(filePrefix, 'positionsFramesIntensity.csv')
   with open(fileName, 'w') as fp:
-    fp.write('# track, numberPositions, deltaFrames, averageIntensity (missing out first and last ones if >= 3 positions), averagePosition\n')
+    fp.write('# track, numberPositions, deltaFrames, averageIntensity, averageSignal, averageBackground, averageNoise, averagePrecision, averageSignalToNoise (averages miss out first and last ones if >= 3 positions), averagePosition\n')
     for n, track in enumerate(tracks):
       averagePosition = ','.join(['%.1f' % pos for pos in track.averagePosition])
-      fp.write('%d,%d,%d,%.1f,%s\n' % (n+1, track.numberPositions, track.deltaFrames, track.averageIntensity, averagePosition))
+      fp.write('%d,%d,%d,%.1f,%.1f,%.1f,%.1f,%.1f,%.1f,%s\n' % (n+1, track.numberPositions, track.deltaFrames, track.averageIntensity,
+          track.averageSignal, track.averageBackground, track.averageNoise, track.averagePrecision, track.averageSignalToNoise, averagePosition))
       
 def savePositionFramesIntensity(tracks, filePrefix):
 
   fileName = _determineOutputFileName(filePrefix, 'positionFramesIntensity.csv')
   with open(fileName, 'w') as fp:
-    fp.write('# averagePosition, deltaFrames, averageIntensity (missing out first and last ones if >= 3 positions)\n')
+    fp.write('# averagePosition, deltaFrames, averageIntensity, averageSignal, averageBackground, averageNoise, averagePrecision, averageSignalToNoise (averages miss out first and last ones if >= 3 positions)\n')
     for n, track in enumerate(tracks):
       averagePosition = ','.join(['%.1f' % pos for pos in track.averagePosition])
-      fp.write('%s,%d,%.1f\n' % (averagePosition, track.deltaFrames, track.averageIntensity))
+      fp.write('%s,%d,%.1f,%.1f,%.1f,%.1f,%.1f,%.1f\n' % (averagePosition, track.deltaFrames, track.averageIntensity,
+          track.averageSignal, track.averageBackground, track.averageNoise, track.averagePrecision, track.averageSignalToNoise))
 
 def saveIntensityHistogram(tracks, filePrefix):
 
