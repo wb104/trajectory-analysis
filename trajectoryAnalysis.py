@@ -11,6 +11,7 @@ def main():
   SUFFIX1D = '.txt'
   SUFFIX2D = '.txt'
   SUFFIX3D = '.csv'
+  SUFFIXNEW = '.xls' # it's not really an xls file, it's a tab-separated text file
   
   from argparse import ArgumentParser
   
@@ -101,8 +102,15 @@ def main():
 
   assert args.numDimensions in (1, 2, 3), 'numDimensions = %d, must be in (1, 2, 3)' % args.numDimensions
 
-  suffix = SUFFIX2D if args.numDimensions == 2 else (SUFFIX3D if args.numDimensions == 3 else SUFFIX1D)
-  
+  if args.isNewPositionFile:
+    suffix = SUFFIXNEW
+  elif args.numDimensions == 1:
+    suffix = SUFFIX1D
+  elif args.numDimensions == 2:
+    suffix = SUFFIX2D
+  else:
+    suffix = SUFFIX3D
+      
   for directory in args.directories:
     print('Processing directory %s' % directory)
     xs = []
