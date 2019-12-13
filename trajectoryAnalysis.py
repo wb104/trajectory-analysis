@@ -21,7 +21,10 @@ def main():
                              epilog=epilog, prefix_chars='-', add_help=True)
                              
   arg_parse.add_argument('directories', nargs='+',
-                         help='Directories containing *%s (or *%s) files to be analysed' % (SUFFIX2D, SUFFIX3D))
+                         help='Directories containing *csv (or *txt or *xls) files to be analysed')
+
+  arg_parse.add_argument('-suffix', default="",
+                         help='Suffix of files to be analysed (usually csv or txt or xls)')
 
   arg_parse.add_argument('-numDimensions', default=2, type=int,
                          help='Number of dimensions for the tracks (1, 2 or 3)')
@@ -43,6 +46,9 @@ def main():
   
   arg_parse.add_argument('-isNewPositionFile', default=False, action='store_true',
                          help='Whether new format position file')
+  
+  arg_parse.add_argument('-fileContainsTrack', default=False, action='store_true',
+                         help='Whether have track instead of position file')
   
   arg_parse.add_argument('-saveTracks', default=False, action='store_true',
                          help='Save frames and positions of tracks to csv file')
@@ -98,11 +104,16 @@ def main():
   arg_parse.add_argument('-calcMeanSquareDisplacements', default=False, action='store_true',
                          help='Calculate mean square displacements for one frame, two frames, three frames, etc.')
                          
+  arg_parse.add_argument('-secondsPerFrame', default=0.5, type=float,
+                         help='Seconds per frame (used in calcMeanSquareDisplacements)')
+  
   args = arg_parse.parse_args()
 
   assert args.numDimensions in (1, 2, 3), 'numDimensions = %d, must be in (1, 2, 3)' % args.numDimensions
 
-  if args.isNewPositionFile:
+  if args.suffix:
+    suffix = args.suffix
+  elif args.isNewPositionFile:
     suffix = SUFFIXNEW
   elif args.numDimensions == 1:
     suffix = SUFFIX1D
@@ -122,8 +133,13 @@ def main():
     for relfileName in relfileNames:
       filePrefix = os.path.join(directory, relfileName[:-len(suffix)])
       fileName = os.path.join(directory, relfileName)
-      print('Determining tracks for %s' % fileName)
-      tracks = Track.determineTracks(fileName, args.numDimensions, args.maxJumpDistance, args.maxFrameGap, args.minNumPositions, args.isNewPositionFile)
+      if args.fileContainsTrack:
+        print('Reading track from %s' % fileName)
+        track = Track.readTrack(fileName, args.numDimensions)
+        tracks = [track]
+      else:
+        print('Determining tracks for %s' % fileName)
+        tracks = Track.determineTracks(fileName, args.numDimensions, args.maxJumpDistance, args.maxFrameGap, args.minNumPositions, args.isNewPositionFile)
         
       if args.saveTracks:
         Track.saveTracks(tracks, filePrefix)
@@ -179,12 +195,12 @@ def main():
         Track.fitSurvivalCounts(tracks, filePrefix, args.fitSurvivalCounts, args.minNumPositions, args.fitUsingLogData, args.plotDpi)
         
       if args.calcMeanSquareDisplacements:
-        track_xs, track_ys = Track.calcMeanSquareDisplacements(tracks, filePrefix, args.plotDpi)
+        track_xs, track_ys = Track.calcMeanSquareDisplacements(tracks, filePrefix, args.secondsPerFrame, args.plotDpi)
         xs.extend(track_xs)
         ys.extend(track_ys)
         all_tracks.extend(tracks)
         
-    if args.calcMeanSquareDisplacements:
+    if args.calcMeanSquareDisplacements and xs:
       Track.endMeanSquareDisplacements(directory, xs, ys, all_tracks, plotDpi=args.plotDpi)
         
     if args.calcMedianIntensity:

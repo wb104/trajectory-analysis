@@ -187,6 +187,36 @@ def _processPosition(finishedTracks, currentTracks, position, frame, intensity, 
     track = Track(position, frame, intensity, signal, background, noise, precision)
     currentTracks.add(track)
 
+def readTrack(fileName, numDimensions):
+  
+  track = None
+  
+  with open(fileName, 'rU') as fp:
+    
+    fp.readline()  # header
+    
+    for line in fp:
+      
+      frame, track_id, x, y, z, mean_intensity, median_intensity = line.rstrip().split(',')[:7]
+      
+      if numDimensions == 1:
+        position = (float(x),)
+      elif numDimensions == 2:
+        position = (float(x), float(y))
+      elif numDimensions == 3:
+        position = (float(x), float(y), float(z))
+      
+      frame = int(frame)
+      position = numpy.array(position)  
+      intensity = float(median_intensity)
+      
+      if track is None:
+        track = Track(position, frame, intensity)
+      else:
+        track.addPosition(position, frame, intensity)
+        
+  return track
+
 def readOldPositionFile(fileName, numDimensions):
   
   with open(fileName, 'rU') as fp:
@@ -800,14 +830,14 @@ def fitSurvivalCounts(tracks, filePrefix, maxNumberExponentials=1, minNumPositio
     fp.write('%s\n' % ','.join(['%s' % w for w in ydata]))
     fp.write('%s\n' % ','.join(['%s' % w for w in yfit]))
             
-def calcMeanSquareDisplacements(tracks, filePrefix, plotDpi=600):
+def calcMeanSquareDisplacements(tracks, filePrefix, secondsPerFrame=0.5, plotDpi=600):
   
   xs = []
   ys = []
   
   for track in tracks:
     msds = track.meanSquareDisplacements()[:-3]  # chop off last three because those have poor stats
-    x = 0.5 * numpy.array(range(1, len(msds)+1)) # TBD: 0.5 secs per frame hardwired for now
+    x = secondsPerFrame * numpy.array(range(1, len(msds)+1))
     y = msds
     plt.loglog(x, y, alpha=0.5)
     xs.append(x)
@@ -837,7 +867,7 @@ def _fitDoubleFunc(xlog, *params):
 def endMeanSquareDisplacements(directory, xs, ys, tracks, xlim=(1.0e-1, 1.0e3), ylim=(1.0e0, 1.0e6), plotDpi=600):
   
   #plt.xlim(xlim)
-  plt.ylim(ylim)
+  #plt.ylim(ylim)
 
   xs = [numpy.array(x) for x in xs]
   ys = [numpy.array(y) for y in ys]
@@ -849,9 +879,10 @@ def endMeanSquareDisplacements(directory, xs, ys, tracks, xlim=(1.0e-1, 1.0e3), 
   yall = xyall[:,1]
   
   n = 0
-  while n < len(xall) and xall[n] <= 25: # HACK
+  while n < len(xall) and xall[n] <= 100: # HACK
     n += 1
-    
+  #n = len(xall)
+   
   xall = xall[:n]
   yall = yall[:n]
   
@@ -875,7 +906,8 @@ def endMeanSquareDisplacements(directory, xs, ys, tracks, xlim=(1.0e-1, 1.0e3), 
   y0 = numpy.power(10, intercept + slope*numpy.log10(x0))
   x1 = numpy.max(xall)
   y1 = numpy.power(10, intercept + slope*numpy.log10(x1))
-  plt.xlim((x0, x1))
+  #plt.xlim((x0, x1))
+  plt.ylim((1.0e-2, 1.0e6)) # HACK
   plt.plot((x0, x1), (y0, y1), color='black', linewidth=2)
    
   """
