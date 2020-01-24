@@ -41,6 +41,9 @@ def main():
   arg_parse.add_argument('-binSize', default=312, type=int,
                          help='The bin size for binned calculations')
   
+  arg_parse.add_argument('-excludeRadius', default=0, type=int,
+                         help='Exclude peaks of lower intensity if within this radius of peak of higher intensity (in x, y)')
+
   arg_parse.add_argument('-plotDpi', default=600, type=int,
                          help='DPI value for binned plots')
   
@@ -139,7 +142,8 @@ def main():
         tracks = [track]
       else:
         print('Determining tracks for %s' % fileName)
-        tracks = Track.determineTracks(fileName, args.numDimensions, args.maxJumpDistance, args.maxFrameGap, args.minNumPositions, args.isNewPositionFile)
+        tracks = Track.determineTracks(fileName, args.numDimensions, args.maxJumpDistance, args.maxFrameGap,
+                                      args.minNumPositions, args.isNewPositionFile, args.excludeRadius)
         
       if args.saveTracks:
         Track.saveTracks(tracks, filePrefix)

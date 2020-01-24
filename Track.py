@@ -283,7 +283,62 @@ def readNewPositionFile(fileName, numDimensions):
       yield (frame, intensity, position, signal, background, noise, precision)
     #print('found %d lines' % n)
 
-def determineTracks(fileName, numDimensions, maxJumpDistance, maxFrameGap, minNumPositions, isNewPositionFile=True):
+def withinExcludeRadius(position1, position2, excludeRadius):
+  
+  delta = numpy.array(position1) - numpy.array(position2)
+  
+  return numpy.sum(delta*delta) < (excludeRadius*excludeRadius)
+  
+def analyseSingleFrameData(singleFrameData, excludeRadius):
+  
+  excludeSet = set()
+  n = len(singleFrameData)
+  for i in range(n-1):
+    if i in excludeSet:
+      continue
+    (frame1, intensity1, position1, signal1, background1, noise1, precision1) = singleFrameData[i]
+    for j in range(i+1, n):
+      if j in excludeSet:
+        continue
+      (frame2, intensity2, position2, signal2, background2, noise2, precision2) = singleFrameData[j]
+      if withinExcludeRadius(position1[:2], position2[:2], excludeRadius):  # only look at x, y, not z
+        if signal1-background1 >= signal2-background2:
+          excludeSet.add(j)
+        else:
+          excludeSet.add(i)
+          break  # no point looking at i further, so skip remaining j
+          
+  filteredSingleFrameData = []
+  for i in range(n):
+    if i not in excludeSet:
+      filteredSingleFrameData.append(singleFrameData[i])
+      
+  return filteredSingleFrameData
+      
+def filterPeaksExcludeRadius(frameData, excludeRadius):
+  
+  currentFrame = None
+  singleFrameData = []
+  filteredFrameData = []
+  
+  for n, (frame, intensity, position, signal, background, noise, precision) in enumerate(frameData):
+    if n > 0 and n % 10000 == 0:
+      print('filtering frame data %d' % n)
+      
+    if (frame != currentFrame) and (currentFrame is not None):
+      filteredSingleFrameData = analyseSingleFrameData(singleFrameData, excludeRadius)
+      filteredFrameData.extend(filteredSingleFrameData)
+      singleFrameData = []
+      
+    currentFrame = frame
+    singleFrameData.append((frame, intensity, position, signal, background, noise, precision))
+      
+  filteredSingleFrameData = analyseSingleFrameData(singleFrameData, excludeRadius)
+  filteredFrameData.extend(filteredSingleFrameData)
+  
+  return filteredFrameData
+  
+def determineTracks(fileName, numDimensions, maxJumpDistance, maxFrameGap, minNumPositions, isNewPositionFile=True, excludeRadius=0):
 
   frameData = []
   
@@ -296,13 +351,17 @@ def determineTracks(fileName, numDimensions, maxJumpDistance, maxFrameGap, minNu
     frameData.append((frame, intensity, position, signal, background, noise, precision))
     
   print('found %d records' % len(frameData))
+  
+  if excludeRadius > 0:
+    frameData = filterPeaksExcludeRadius(frameData, excludeRadius)
+    print('have %d records after filtering on excludeRadius' % len(frameData))
     
   finishedTracks = set()
   currentTracks = set()
 
   frameData.sort() # old data might not be in frame order
   for n, (frame, intensity, position, signal, background, noise, precision) in enumerate(frameData):
-    if n > 0 and n % 1000 == 0:
+    if n > 0 and n % 10000 == 0:
       print('processing frame data %d (finishedTracks %d, currentTracks %d)' % (n, len(finishedTracks), len(currentTracks)))
     _processPosition(finishedTracks, currentTracks, position, frame, intensity, signal, background, noise, precision, maxJumpDistance, maxFrameGap)
       
