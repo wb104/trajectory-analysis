@@ -230,11 +230,12 @@ def readOldPositionFile(fileName, numDimensions):
       if numDimensions == 1:
         (frame, x) = line.rstrip().split()[:2]
         position = (float(x),)
-        intensity = base = 0
+        signal = intensity = background = 0
       elif numDimensions == 2:
         (x, y, frame, intensity) = line.rstrip().split()[:4]
         position = (float(x), float(y))
-        base = 0
+        signal = intensity
+        background = 0
       elif numDimensions == 3:
         #(x, y, z, frame, intensity) = line.rstrip().split()[:5]
         (frame, junk, x, y, z, junk, junk, junk, signal, background) = line.rstrip().split(',')[:10]
